@@ -1,15 +1,15 @@
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
-  GoogleAuthProvider,
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   type User,
 } from "firebase/auth";
 
 export type { User };
+
 import {
   getFirestore,
   doc,
@@ -28,9 +28,7 @@ import {
   type QueryConstraint,
 } from "firebase/firestore";
 
-// ─── Your Firebase config ──────────────────────────────────────────────────────
-// Replace these values with your own from the Firebase Console
-// (Project Settings → General → Your apps → Web app → Config)
+// ─── Firebase config ───────────────────────────────────────────────────────────
 
 const firebaseConfig = {
   apiKey: "AIzaSyA8dw8ahBJ_HWnCfoNHGFtSborxzFpW6O0",
@@ -47,25 +45,17 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const googleProvider = new GoogleAuthProvider();
 
 // ─── Auth helpers ──────────────────────────────────────────────────────────────
 
-export async function signInWithGoogle(): Promise<User> {
-  await signInWithRedirect(auth, googleProvider);
-  // Redirect means we navigate away — this promise never resolves normally.
-  // The result is picked up by getRedirectResult on page reload.
-  throw new Error('Redirecting to Google...');
+export async function signIn(email: string, password: string): Promise<User> {
+  const result = await signInWithEmailAndPassword(auth, email, password);
+  return result.user;
 }
 
-export async function handleRedirectResult(): Promise<User | null> {
-  try {
-    const result = await getRedirectResult(auth);
-    return result?.user ?? null;
-  } catch (err) {
-    console.error('Redirect sign-in error:', err);
-    return null;
-  }
+export async function signUp(email: string, password: string): Promise<User> {
+  const result = await createUserWithEmailAndPassword(auth, email, password);
+  return result.user;
 }
 
 export async function signOut(): Promise<void> {
@@ -80,9 +70,6 @@ export { auth, db };
 
 // ─── Firestore data helpers ────────────────────────────────────────────────────
 
-/**
- * Build a user-scoped path: users/{uid}/{collection}
- */
 function userPath(uid: string, ...segments: string[]): string {
   return `users/${uid}/${segments.join("/")}`;
 }
