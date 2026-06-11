@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { studioApi } from '@/lib/studioApi'
+import { streamWithFallback, setApiKey } from '@/lib/openrouter'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -338,7 +339,7 @@ export const useStudioStore = create<StudioStore>((set, get) => ({
 
       let fullContent = ''
 
-      await studioApi.ai.streamChat(contextMessages, selectedModel, (chunk: string | null) => {
+      await streamWithFallback(contextMessages, selectedModel, (chunk: string | null) => {
         if (chunk === null) return
         fullContent += chunk
         set(state => ({
@@ -376,11 +377,19 @@ export const useStudioStore = create<StudioStore>((set, get) => ({
   fetchSettings: async () => {
     const settings = await studioApi.settings.getAll()
     set({ settings })
+    // Sync API key to global for openrouter streaming
+    if (settings.openrouter_api_key) {
+      setApiKey(settings.openrouter_api_key)
+    }
   },
 
   setSetting: async (key, value) => {
     await studioApi.settings.set(key, value)
     set(state => ({ settings: { ...state.settings, [key]: value } }))
+    // Sync API key to global for openrouter streaming
+    if (key === 'openrouter_api_key') {
+      setApiKey(value)
+    }
   },
 }))
 
