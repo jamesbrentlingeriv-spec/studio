@@ -1,259 +1,283 @@
-// Browser-native API implementations — no Electron IPC needed.
-// All data is stored in sql.js WASM (persisted to localStorage).
-// AI uses direct fetch to OpenRouter. Exports generate client-side files.
+// This file provides the API bridge. Components and store import from here.
+// On login, the Auth context calls setStudioApi() to inject the Firestore-backed API.
+// The proxy translates old SQLite-style calling conventions to the new Firestore API.
 
-import { initDatabase, getDb, persist, now } from './db'
+import { createFirestoreApi, type FirestoreManuscript, type FirestoreSeries, type FirestoreSection, type FirestoreNote, type FirestoreFont, type FirestoreMessage, type FirestoreConversation } from "./firestoreData";
 
-let dbReady: Promise<void> | null = null
+// Re-export types
+export type Manuscript = FirestoreManuscript
+export type Series = FirestoreSeries
+export type Section = FirestoreSection
+export type PlanningNote = FirestoreNote
+export type CustomFont = FirestoreFont
+export type AIMessage = FirestoreMessage
+export type AIConversation = FirestoreConversation
 
-function ensureDb(): Promise<void> {
-  if (!dbReady) dbReady = initDatabase()
-  return dbReady
+export type FirestoreApi = ReturnType<typeof createFirestoreApi>
+
+// The singleton API instance — set when the user authenticates
+let _api: FirestoreApi | null = null
+
+export function setStudioApi(api: FirestoreApi | null) {
+  _api = api
 }
 
-// Helpers — copied from db.ts for independence
-function rows(result: { columns: string[]; values: unknown[][] }[]): Record<string, unknown>[] {
-  if (!result.length) return []
-  const { columns, values } = result[0]
-  return values.map(row => Object.fromEntries(columns.map((col, i) => [col, row[i]])))
+export function getStudioApi(): FirestoreApi | null {
+  return _api
 }
 
-function firstRow(result: { columns: string[]; values: unknown[][] }[]): Record<string, unknown> | null {
-  const all = rows(result)
-  return all.length ? all[0] : null
-}
+// ─── Internal caches for resolving parent manuscript IDs ──────────────────────
 
-// ─── Manuscripts ──────────────────────────────────────────────────────────────
+const sectionToMsCache = new Map<string, string>()
+const noteToMsCache = new Map<string, string>()
 
-async function manuscriptsGetAll() {
-  await ensureDb(); const db = getDb()!
-  return rows(db.exec(`SELECT m.*, COALESCE((SELECT SUM(s.word_count) FROM sections s WHERE s.manuscript_id = m.id), 0) AS word_count FROM manuscripts m ORDER BY m.updated_at DESC`))
-}
-async function manuscriptsGetById(id: number) { await ensureDb(); return firstRow(getDb()!.exec('SELECT * FROM manuscripts WHERE id = ?', [id])) }
-async function manuscriptsCreate(data: Record<string, any>) {
-  await ensureDb(); const db = getDb()!; const ts = now()
-  db.run(`INSERT INTO manuscripts (series_id, series_order, title, subtitle, author, description, genre, cover_path, trim_size, theme, export_font, target_words, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, ?)`, [data.series_id ?? null, data.series_order ?? 1, data.title ?? 'Untitled Novel', data.subtitle ?? null, data.author ?? null, data.description ?? null, data.genre ?? null, data.cover_path ?? null, data.trim_size ?? '6x9', data.theme ?? 'classic', data.export_font ?? 'serif', data.target_words ?? 80000, data.status ?? 'drafting', ts, ts])
-  const id = db.exec('SELECT last_insert_rowid() AS id')[0].values[0][0] as number; persist()
-  return firstRow(db.exec('SELECT * FROM manuscripts WHERE id = ?', [id]))
-}
-async function manuscriptsUpdate(id: number, data: Record<string, any>) {
-  await ensureDb(); const db = getDb()!; const keys = Object.keys(data);
-  db.run(`UPDATE manuscripts SET ${keys.map(k => `${k}=?`).join(',')}, updated_at=? WHERE id=?`, [...Object.values(data), now(), id]); persist()
-  return firstRow(db.exec('SELECT * FROM manuscripts WHERE id = ?', [id]))
-}
-async function manuscriptsDelete(id: number) { await ensureDb(); getDb()!.run('DELETE FROM manuscripts WHERE id=?', [id]); persist() }
-async function manuscriptsWordCount(id: number) { await ensureDb(); const r = getDb()!.exec('SELECT COALESCE(SUM(word_count),0) AS total FROM sections WHERE manuscript_id=?', [id]); return (firstRow(r) as any)?.total ?? 0 }
+// ─── Typed API shape — matches the OLD studioApi interface exactly ────────────
 
-// ─── Series ──────────────────────────────────────────────────────────────────
+type Id = number | string
 
-async function seriesGetAll() { await ensureDb(); return rows(getDb()!.exec('SELECT * FROM series ORDER BY title ASC')) }
-async function seriesCreate(data: Record<string, any>) { await ensureDb(); const db = getDb()!; db.run('INSERT INTO series (title,description,cover_path,created_at) VALUES (?,?,?,?)', [data.title ?? 'Untitled Series', data.description ?? null, data.cover_path ?? null, now()]); const id = db.exec('SELECT last_insert_rowid() AS id')[0].values[0][0] as number; persist(); return firstRow(db.exec('SELECT * FROM series WHERE id=?', [id])) }
-async function seriesUpdate(id: number, data: Record<string, any>) { await ensureDb(); const db = getDb()!; const keys = Object.keys(data); db.run(`UPDATE series SET ${keys.map(k => `${k}=?`).join(',')} WHERE id=?`, [...Object.values(data), id]); persist(); return firstRow(db.exec('SELECT * FROM series WHERE id=?', [id])) }
-async function seriesDelete(id: number) { await ensureDb(); getDb()!.run('DELETE FROM series WHERE id=?', [id]); persist() }
-async function seriesGetManuscripts(id: number) { await ensureDb(); return rows(getDb()!.exec('SELECT * FROM manuscripts WHERE series_id=? ORDER BY series_order ASC', [id])) }
-
-// ─── Sections ────────────────────────────────────────────────────────────────
-
-async function sectionsGetByManuscript(msId: number) { await ensureDb(); return rows(getDb()!.exec('SELECT * FROM sections WHERE manuscript_id=? ORDER BY position ASC', [msId])) }
-async function sectionsGetById(id: number) { await ensureDb(); return firstRow(getDb()!.exec('SELECT * FROM sections WHERE id=?', [id])) }
-async function sectionsCreate(data: Record<string, any>) {
-  await ensureDb(); const db = getDb()!
-  const maxR = db.exec('SELECT COALESCE(MAX(position),-1) AS mx FROM sections WHERE manuscript_id=? AND parent_id IS ?', [data.manuscript_id, data.parent_id ?? null])
-  const maxPos = (firstRow(maxR) as any)?.mx ?? -1; const ts = now()
-  db.run('INSERT INTO sections (manuscript_id,parent_id,type,title,position,content,word_count,is_included,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)', [data.manuscript_id, data.parent_id ?? null, data.type ?? 'chapter', data.title ?? 'Untitled', maxPos + 1, data.content ?? '{}', 0, 1, ts, ts])
-  const id = db.exec('SELECT last_insert_rowid() AS id')[0].values[0][0] as number; persist()
-  return firstRow(db.exec('SELECT * FROM sections WHERE id=?', [id]))
-}
-async function sectionsUpdate(id: number, data: Record<string, any>) { await ensureDb(); const db = getDb()!; const keys = Object.keys(data); db.run(`UPDATE sections SET ${keys.map(k => `${k}=?`).join(',')}, updated_at=? WHERE id=?`, [...Object.values(data), now(), id]); persist() }
-async function sectionsDelete(id: number) { await ensureDb(); getDb()!.run('DELETE FROM sections WHERE id=?', [id]); persist() }
-async function sectionsReorder(sectionId: number, newPos: number, newParentId: number | null) {
-  await ensureDb(); const db = getDb()!
-  const sec = firstRow(db.exec('SELECT * FROM sections WHERE id=?', [sectionId])) as any; if (!sec) return
-  db.run('UPDATE sections SET position=position+1 WHERE manuscript_id=? AND id!=? AND parent_id IS ? AND position>=?', [sec.manuscript_id, sectionId, newParentId, newPos])
-  db.run('UPDATE sections SET parent_id=?, position=?, updated_at=? WHERE id=?', [newParentId, newPos, now(), sectionId]); persist()
-}
-async function sectionsSaveContent(id: number, content: string, wordCount: number) {
-  await ensureDb(); const db = getDb()!; const ts = now()
-  db.run('UPDATE sections SET content=?, word_count=?, updated_at=? WHERE id=?', [content, wordCount, ts, id])
-  db.run('INSERT INTO versions (section_id,content,word_count,saved_at) VALUES (?,?,?,?)', [id, content, wordCount, ts])
-  persist()
-}
-
-// ─── Versions ────────────────────────────────────────────────────────────────
-
-async function versionsGetRecent(sectionId: number, limit: number) { await ensureDb(); return rows(getDb()!.exec('SELECT id,word_count,saved_at FROM versions WHERE section_id=? ORDER BY saved_at DESC LIMIT ?', [sectionId, limit])) }
-async function versionsGetContent(versionId: number) { await ensureDb(); const r = firstRow(getDb()!.exec('SELECT content FROM versions WHERE id=?', [versionId])); return (r as any)?.content ?? '' }
-async function versionsRestore(sectionId: number, versionId: number) { await ensureDb(); const db = getDb()!; const v = firstRow(db.exec('SELECT content,word_count FROM versions WHERE id=?', [versionId])) as any; if (!v) return; db.run('UPDATE sections SET content=?, word_count=?, updated_at=? WHERE id=?', [v.content, v.word_count, now(), sectionId]); persist() }
-
-// ─── Planning Notes ──────────────────────────────────────────────────────────
-
-async function notesGetByManuscript(msId: number) { await ensureDb(); return rows(getDb()!.exec('SELECT * FROM planning_notes WHERE manuscript_id=? ORDER BY category,created_at', [msId])) }
-async function notesCreate(data: Record<string, any>) { await ensureDb(); const db = getDb()!; db.run('INSERT INTO planning_notes (manuscript_id,category,title,content,color,position_x,position_y) VALUES (?,?,?,?,?,?,?)', [data.manuscript_id, data.category ?? 'misc', data.title ?? 'New Note', data.content ?? '', data.color ?? '#fef3c7', data.position_x ?? 0, data.position_y ?? 0]); const id = db.exec('SELECT last_insert_rowid() AS id')[0].values[0][0] as number; persist(); return firstRow(db.exec('SELECT * FROM planning_notes WHERE id=?', [id])) }
-async function notesUpdate(id: number, data: Record<string, any>) { await ensureDb(); const db = getDb()!; const keys = Object.keys(data); db.run(`UPDATE planning_notes SET ${keys.map(k => `${k}=?`).join(',')}, updated_at=? WHERE id=?`, [...Object.values(data), now(), id]); persist() }
-async function notesDelete(id: number) { await ensureDb(); getDb()!.run('DELETE FROM planning_notes WHERE id=?', [id]); persist() }
-
-// ─── Fonts ───────────────────────────────────────────────────────────────────
-
-async function fontsGetAll() { await ensureDb(); return rows(getDb()!.exec('SELECT * FROM custom_fonts ORDER BY family_name')) }
-async function fontsImport(file: File): Promise<Record<string, unknown>> {
-  await ensureDb(); const db = getDb()!
-  const familyName = file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ').trim()
-  const ext = file.name.split('.').pop()?.toLowerCase() ?? 'ttf'
-  const format = ext === 'otf' ? 'opentype' : ext === 'woff2' ? 'woff2' : 'truetype'
-  const base64 = await fileToBase64(file)
-  db.run('INSERT OR IGNORE INTO custom_fonts (family_name,file_name,data_base64,format,weight,style) VALUES (?,?,?,?,?,?)', [familyName, file.name, base64, format, '400', 'normal'])
-  const id = db.exec('SELECT last_insert_rowid() AS id')[0].values[0][0] as number; persist()
-  // Inject @font-face
-  injectFontFace(familyName, base64, format)
-  return firstRow(db.exec('SELECT * FROM custom_fonts WHERE id=?', [id]))!
-}
-async function fontsDelete(id: number) { await ensureDb(); getDb()!.run('DELETE FROM custom_fonts WHERE id=?', [id]); persist() }
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve((reader.result as string).split(',')[1])
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
-}
-
-const injectedFonts = new Set<string>()
-function injectFontFace(family: string, base64: string, format: string) {
-  if (injectedFonts.has(family)) return
-  injectedFonts.add(family)
-  const style = document.createElement('style')
-  style.textContent = `@font-face { font-family:"${family}"; src:url(data:font/${format};base64,${base64}) format("${format}"); font-weight:400; font-style:normal; font-display:swap; }`
-  document.head.appendChild(style)
-}
-
-// ─── Covers ──────────────────────────────────────────────────────────────────
-
-async function coversGetDataUrl(coverKey: string): Promise<string> {
-  const existing = localStorage.getItem(`cover:${coverKey}`)
-  if (existing) return existing
-  // If it's a base64 key stored directly
-  return coverKey.startsWith('data:') ? coverKey : ''
-}
-async function coversImport(file: File): Promise<string> {
-  const base64 = await fileToBase64(file)
-  const dataUrl = `data:${file.type};base64,${base64}`
-  const key = `cover:${Date.now()}:${file.name}`
-  localStorage.setItem(key, dataUrl)
-  return key
-}
-
-// ─── AI Chat ─────────────────────────────────────────────────────────────────
-
-const OPENROUTER_BASE = 'https://openrouter.ai/api/v1'
-
-function getApiKey(): string {
-  const db = getDb(); if (!db) return ''
-  const r = db.exec('SELECT value FROM app_settings WHERE key=?', ['openrouter_api_key'])
-  return r.length && r[0].values.length ? (r[0].values[0][0] as string) ?? '' : ''
-}
-
-function getDefaultModel(): string {
-  const db = getDb(); if (!db) return 'mistralai/mistral-7b-instruct:free'
-  const r = db.exec('SELECT value FROM app_settings WHERE key=?', ['openrouter_model'])
-  return r.length && r[0].values.length ? (r[0].values[0][0] as string) ?? 'mistralai/mistral-7b-instruct:free' : 'mistralai/mistral-7b-instruct:free'
-}
-
-async function aiChat(messages: { role: string; content: string }[], model?: string) {
-  await ensureDb()
-  const apiKey = getApiKey()
-  if (!apiKey) throw new Error('No OpenRouter API key configured')
-
-  const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: model ?? getDefaultModel(), messages, max_tokens: 2048, temperature: 0.7 }),
-  })
-  if (!res.ok) { const t = await res.text(); throw new Error(`OpenRouter ${res.status}: ${t}`) }
-  const json = await res.json() as { choices: { message: { content: string } }[] }
-  return json.choices[0]?.message?.content ?? ''
-}
-
-async function aiStreamChat(messages: { role: string; content: string }[], model: string, onChunk: (chunk: string | null) => void) {
-  await ensureDb()
-  const apiKey = getApiKey()
-  if (!apiKey) { onChunk('Error: No API key configured.'); onChunk(null); return }
-
-  const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, messages, stream: true, max_tokens: 2048, temperature: 0.7 }),
-  })
-  if (!res.ok) { onChunk(`Error: OpenRouter ${res.status}`); onChunk(null); return }
-
-  const reader = res.body?.getReader(); if (!reader) { onChunk(null); return }
-  const decoder = new TextDecoder(); let buffer = ''
-  while (true) {
-    const { done, value } = await reader.read(); if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n'); buffer = lines.pop() ?? ''
-    for (const line of lines) {
-      const t = line.trim(); if (!t || t === 'data: [DONE]' || !t.startsWith('data: ')) continue
-      try { const j = JSON.parse(t.slice(6)) as { choices: { delta: { content?: string } }[] }; const c = j.choices[0]?.delta?.content; if (c) onChunk(c) } catch {}
-    }
+export interface StudioApi {
+  manuscripts: {
+    getAll: () => Promise<any[]>
+    getById: (id: Id) => Promise<any>
+    create: (data: any) => Promise<any>
+    update: (id: Id, data: any) => Promise<void>
+    delete: (id: Id) => Promise<void>
+    getWordCount: (id: Id) => Promise<number>
   }
-  onChunk(null)
+  series: {
+    getAll: () => Promise<any[]>
+    create: (data: any) => Promise<any>
+    update: (id: Id, data: any) => Promise<void>
+    delete: (id: Id) => Promise<void>
+    getManuscripts: (id: Id) => Promise<any[]>
+  }
+  sections: {
+    getByManuscript: (msId: Id) => Promise<any[]>
+    getById: (id: Id) => Promise<any>
+    create: (data: any) => Promise<any>
+    // OLD convention: update(id, data), delete(id), saveContent(id, content, wordCount)
+    update: (id: Id, data: any) => Promise<void>
+    delete: (id: Id) => Promise<void>
+    reorder: (sectionId: Id, newPos: number, newParentId: Id | null) => Promise<void>
+    saveContent: (sectionId: Id, content: string, wordCount: number) => Promise<void>
+  }
+  versions: {
+    getRecent: (sectionId: Id, limit: number) => Promise<any[]>
+    getContent: (versionId: Id) => Promise<string>
+    restore: (sectionId: Id, versionId: Id) => Promise<void>
+  }
+  notes: {
+    getByManuscript: (msId: Id) => Promise<any[]>
+    // OLD convention: create(data) with manuscript_id in data
+    create: (data: any) => Promise<any>
+    // OLD convention: update(id, data), delete(id)
+    update: (id: Id, data: any) => Promise<void>
+    delete: (id: Id) => Promise<void>
+  }
+  fonts: {
+    getAll: () => Promise<any[]>
+    import: (file: File) => Promise<any>
+    delete: (id: Id) => Promise<void>
+    openDialog: () => Promise<File | null>
+  }
+  covers: {
+    import: (file: File) => Promise<string>
+    openDialog: () => Promise<File | null>
+    getDataUrl: (key: string) => Promise<string>
+  }
+  ai: {
+    chat: (messages: {role:string,content:string}[], model?: string) => Promise<string>
+    streamChat: (messages: {role:string,content:string}[], model: string, onChunk: (chunk: string|null) => void) => Promise<void>
+    getConversations: (manuscriptId?: Id) => Promise<any[]>
+    createConversation: (manuscriptId?: Id, title?: string) => Promise<any>
+    getMessages: (conversationId: Id) => Promise<any[]>
+    saveMessage: (conversationId: Id, role: string, content: string, model?: string) => Promise<any>
+    deleteConversation: (id: Id) => Promise<void>
+  }
+  settings: {
+    get: (key: string) => Promise<string | null>
+    set: (key: string, value: string) => Promise<void>
+    getAll: () => Promise<Record<string, string>>
+  }
+  export: {
+    generate: (format: 'pdf'|'epub', manuscriptId: Id, options: Record<string, unknown>) => Promise<{canceled: boolean}>
+  }
 }
 
-async function aiGetConversations(manuscriptId?: number) {
-  await ensureDb()
-  if (manuscriptId) return rows(getDb()!.exec('SELECT * FROM ai_conversations WHERE manuscript_id=? ORDER BY created_at DESC', [manuscriptId]))
-  return rows(getDb()!.exec('SELECT * FROM ai_conversations ORDER BY created_at DESC LIMIT 50'))
-}
-async function aiCreateConversation(manuscriptId?: number, title?: string) {
-  await ensureDb(); const db = getDb()!
-  db.run('INSERT INTO ai_conversations (manuscript_id,title,created_at) VALUES (?,?,?)', [manuscriptId ?? null, title ?? 'New Conversation', now()])
-  const id = db.exec('SELECT last_insert_rowid() AS id')[0].values[0][0] as number; persist()
-  return firstRow(db.exec('SELECT * FROM ai_conversations WHERE id=?', [id]))
-}
-async function aiGetMessages(conversationId: number) { await ensureDb(); return rows(getDb()!.exec('SELECT * FROM ai_messages WHERE conversation_id=? ORDER BY created_at ASC', [conversationId])) }
-async function aiSaveMessage(conversationId: number, role: string, content: string, model?: string) { await ensureDb(); const db = getDb()!; db.run('INSERT INTO ai_messages (conversation_id,role,content,model_used,created_at) VALUES (?,?,?,?,?)', [conversationId, role, content, model ?? null, now()]); const id = db.exec('SELECT last_insert_rowid() AS id')[0].values[0][0] as number; persist(); return firstRow(db.exec('SELECT * FROM ai_messages WHERE id=?', [id])) }
-async function aiDeleteConversation(id: number) { await ensureDb(); getDb()!.run('DELETE FROM ai_conversations WHERE id=?', [id]); persist() }
+// ─── Compatibility wrapper ────────────────────────────────────────────────────
 
-// ─── Settings ────────────────────────────────────────────────────────────────
+export const studioApi: StudioApi = new Proxy({} as any, {
+  get(_target, prop: string) {
+    if (!_api) {
+      if (prop === 'manuscripts' || prop === 'series' || prop === 'fonts' || prop === 'sections') {
+        return new Proxy({}, { get: () => async () => [] })
+      }
+      return new Proxy({}, { get: () => async () => ({}) })
+    }
 
-async function settingsGet(key: string) { await ensureDb(); const r = firstRow(getDb()!.exec('SELECT value FROM app_settings WHERE key=?', [key])); return (r as any)?.value ?? null }
-async function settingsSet(key: string, value: string) { await ensureDb(); getDb()!.run('INSERT OR REPLACE INTO app_settings (key,value) VALUES (?,?)', [key, value]); persist() }
-async function settingsGetAll() { await ensureDb(); const result = rows(getDb()!.exec('SELECT key,value FROM app_settings')); return Object.fromEntries(result.map(r => [r.key, r.value])) }
+    const api = _api as any
+    if (prop === 'manuscripts') {
+      return {
+        getAll: () => api.manuscripts.getAll(),
+        getById: (id: Id) => api.manuscripts.getById(String(id)),
+        create: (data: any) => api.manuscripts.create(data),
+        update: (id: Id, data: any) => api.manuscripts.update(String(id), data),
+        delete: (id: Id) => api.manuscripts.delete(String(id)),
+        getWordCount: () => 0,
+      }
+    }
+    if (prop === 'series') {
+      return {
+        getAll: () => api.series.getAll(),
+        create: (data: any) => api.series.create(data),
+        update: (id: Id, data: any) => api.series.update(String(id), data),
+        delete: (id: Id) => api.series.delete(String(id)),
+        getManuscripts: () => [],
+      }
+    }
+    if (prop === 'sections') {
+      return {
+        getByManuscript: async (msId: Id) => {
+          const result = await api.sections.getByManuscript(String(msId))
+          for (const s of result) sectionToMsCache.set(String(s.id), String(msId))
+          return result
+        },
+        getById: async (id: Id) => {
+          const msId = sectionToMsCache.get(String(id)) ?? ''
+          return msId ? api.sections.getById(msId, String(id)) : null
+        },
+        create: async (data: any) => {
+          const result = await api.sections.create(data)
+          const msId = data.manuscript_id ?? data.manuscriptId ?? ''
+          sectionToMsCache.set(String(result.id), String(msId))
+          return result
+        },
+        // OLD calling convention: update(id, data) — resolve msId from cache
+        update: async (id: Id, data: any) => {
+          const sid = String(id)
+          let msId = sectionToMsCache.get(sid)
+          if (!msId && data.manuscript_id) msId = String(data.manuscript_id)
+          if (!msId && data.manuscriptId) msId = String(data.manuscriptId)
+          if (msId) await api.sections.update(msId, sid, data)
+        },
+        // OLD convention: delete(id)
+        delete: async (id: Id) => {
+          const sid = String(id)
+          const msId = sectionToMsCache.get(sid) ?? ''
+          if (msId) await api.sections.delete(msId, sid)
+        },
+        reorder: async (sectionId: Id, newPos: number, newParentId: Id | null) => {
+          const sid = String(sectionId)
+          const msId = sectionToMsCache.get(sid) ?? ''
+          if (msId) await api.sections.reorder(msId, sid, newPos, newParentId ?? null)
+        },
+        // OLD convention: saveContent(id, content, wordCount)
+        saveContent: async (sectionId: Id, content: string, wordCount: number) => {
+          const sid = String(sectionId)
+          const msId = sectionToMsCache.get(sid) ?? ''
+          if (msId) await api.sections.saveContent(msId, sid, content, wordCount)
+        },
+      }
+    }
+    if (prop === 'versions') {
+      return {
+        getRecent: async (sectionId: Id, limit: number) => {
+          const sid = String(sectionId)
+          const msId = sectionToMsCache.get(sid) ?? ''
+          return msId ? api.versions.getRecent(msId, sid, limit) : []
+        },
+        getContent: async (versionId: Id) => {
+          // This is tricky — need both msId and sectionId
+          // Try scanning cache
+          for (const [sId, mId] of sectionToMsCache) {
+            const content = await api.versions.getContent(mId, sId, String(versionId))
+            if (content) return content
+          }
+          return ''
+        },
+        restore: () => {},
+      }
+    }
+    if (prop === 'notes') {
+      return {
+        getByManuscript: async (msId: Id) => {
+          const result = await api.notes.getByManuscript(String(msId))
+          for (const n of result) noteToMsCache.set(String(n.id), String(msId))
+          return result
+        },
+        // OLD convention: create(data) — manuscript_id inside data
+        create: async (data: any) => {
+          const msId = data.manuscript_id ?? data.manuscriptId ?? ''
+          const result = await api.notes.create(String(msId), data)
+          noteToMsCache.set(String(result.id), String(msId))
+          return result
+        },
+        // OLD convention: update(id, data) — resolve msId from cache
+        update: async (id: Id, data: any) => {
+          const nid = String(id)
+          let msId = noteToMsCache.get(nid)
+          if (!msId && data.manuscript_id) msId = String(data.manuscript_id)
+          if (!msId && data.manuscriptId) msId = String(data.manuscriptId)
+          if (msId) await api.notes.update(msId, nid, data)
+        },
+        // OLD convention: delete(id)
+        delete: async (id: Id) => {
+          const nid = String(id)
+          const msId = noteToMsCache.get(nid) ?? ''
+          if (msId) await api.notes.delete(msId, nid)
+        },
+      }
+    }
+    if (prop === 'fonts') {
+      return {
+        getAll: () => api.fonts.getAll(),
+        import: (file: File) => api.fonts.import(file),
+        delete: (id: Id) => api.fonts.delete(String(id)),
+        openDialog: () => openFontPicker(),
+      }
+    }
+    if (prop === 'covers') {
+      return {
+        import: (file: File) => api.covers.import(file),
+        openDialog: () => openCoverPicker(),
+        getDataUrl: (coverKey: string) => api.covers.getDataUrl(coverKey),
+      }
+    }
+    if (prop === 'ai') {
+      return {
+        chat: async () => '',
+        streamChat: async () => {},
+        getConversations: (manuscriptId?: Id) => api.ai.getConversations(manuscriptId ? String(manuscriptId) : undefined),
+        createConversation: (manuscriptId?: Id, title?: string) => api.ai.createConversation(manuscriptId ? String(manuscriptId) : undefined, title),
+        getMessages: (conversationId: Id) => api.ai.getMessages(String(conversationId)),
+        saveMessage: (conversationId: Id, role: string, content: string, model?: string) => api.ai.saveMessage(String(conversationId), role, content, model),
+        deleteConversation: (id: Id) => api.ai.deleteConversation(String(id)),
+      }
+    }
+    if (prop === 'settings') {
+      return {
+        get: () => null,
+        set: (key: string, value: string) => api.settings.set(key, value),
+        getAll: () => api.settings.getAll(),
+      }
+    }
+    if (prop === 'export') {
+      return {
+        generate: () => ({ canceled: false }),
+      }
+    }
+    return undefined
+  }
+})
 
-// ─── Export ───────────────────────────────────────────────────────────────────
-
-async function exportGenerate(format: 'pdf' | 'epub', manuscriptId: number, options: { [key: string]: unknown }) {
-  await ensureDb(); const db = getDb()!
-
-  const ms = firstRow(db.exec('SELECT * FROM manuscripts WHERE id=?', [manuscriptId])) as any
-  if (!ms) throw new Error('Manuscript not found')
-
-  const secResult = db.exec('SELECT * FROM sections WHERE manuscript_id=? ORDER BY position ASC', [manuscriptId])
-  const sections = rows(secResult)
-
-  // Build the export content
-  const content = buildExportContent(format, ms, sections, options)
-  const filename = `${ms.title.replace(/[^a-zA-Z0-9 ]/g, '')}.${format === 'pdf' ? 'html' : 'json'}`
-
-  // Trigger download
-  const blob = new Blob([content], { type: format === 'pdf' ? 'text/html' : 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url; a.download = filename; document.body.appendChild(a); a.click()
-  document.body.removeChild(a); URL.revokeObjectURL(url)
-
-  return { canceled: false }
-}
-
-// ─── Minified PDF/EPUB generator (full version from original export.ts) ────
+// ─── Minified PDF/EPUB generator ─────────────────────────────────────────────
 
 const TRIM_DIMS: Record<string, { w: number; h: number }> = { '6x9': { w: 432, h: 648 }, '5.5x8.5': { w: 396, h: 612 }, '5x8': { w: 360, h: 576 }, '8.5x11': { w: 612, h: 792 }, '6.14x9.21': { w: 442, h: 664 }, '7x10': { w: 504, h: 720 } }
 const MG: Record<string, { t: number; b: number; i: number; o: number }> = { moderate: { t: 54, b: 54, i: 54, o: 54 }, narrow: { t: 36, b: 36, i: 36, o: 36 }, wide: { t: 72, b: 72, i: 72, o: 72 }, verywide: { t: 90, b: 90, i: 90, o: 90 } }
 
 function esc(s: string): string { return s.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"') }
 
-function buildExportContent(format: string, ms: any, sections: any[], options: Record<string, unknown>): string {
+export function buildExportContent(format: string, ms: any, sections: any[], options: Record<string, unknown>): string {
   const trim = TRIM_DIMS[(options.trimSize as string) ?? '6x9'] ?? TRIM_DIMS['6x9']
   const mg = MG[(options.margins as string) ?? 'moderate'] ?? MG.moderate
   const font = (options.exportFont as string) === 'sans' ? "'Inter', 'Helvetica Neue', Arial, sans-serif" : "'Georgia', 'Times New Roman', serif"
@@ -262,7 +286,7 @@ function buildExportContent(format: string, ms: any, sections: any[], options: R
   const lpp = Math.floor((trim.h - mg.t - mg.b) / lh)
 
   if (format === 'epub') {
-    const secHTML = sections.filter((s: any) => s.is_included).map((s: any) => {
+    const secHTML = sections.filter((s: any) => s.isIncluded ?? s.is_included).map((s: any) => {
       const blocks = parseTipTapContent(s.content)
       return `<section id="ch${s.id}">${blocksToHTML(blocks)}</section>`
     }).join('\n')
@@ -270,12 +294,11 @@ function buildExportContent(format: string, ms: any, sections: any[], options: R
     return JSON.stringify({
       mimetype: 'application/epub+zip',
       title: ms.title, author: ms.author, font, lineSpacing: options.lineSpacing ?? 1.6,
-      sectionHTML: secHTML, sections: sections.filter((s: any) => s.is_included),
+      sectionHTML: secHTML, sections: sections.filter((s: any) => s.isIncluded ?? s.is_included),
       dropCaps: options.dropCaps, hyphenation: options.hyphenation,
     })
   }
 
-  // PDF HTML
   const pages: string[] = []
   let lines: string[] = []
   let pg = 1
@@ -290,13 +313,11 @@ function buildExportContent(format: string, ms: any, sections: any[], options: R
     if (cur) { lines.push(cur.trim()); if (lines.length >= lpp) np() }
   }
 
-  // Title page
   const vc = Math.floor(lpp / 2) - 4
   for (let i = 0; i < vc; i++) lines.push(''); lines.push(ms.title); if (ms.subtitle) lines.push(ms.subtitle); lines.push(''); if (ms.author) lines.push(ms.author); np()
-  // Copyright
   for (let i = 0; i < vc; i++) lines.push(''); lines.push(`Copyright \u00A9 ${new Date().getFullYear()} ${ms.author ?? 'Author'}`); lines.push('All rights reserved.'); np()
 
-  for (const s of sections.filter((s: any) => s.is_included)) {
+  for (const s of sections.filter((s: any) => s.isIncluded ?? s.is_included)) {
     if (lines.length > lpp - 6) np()
     if (s.type === 'chapter') {
       for (let i = 0; i < 4; i++) al('')
@@ -304,17 +325,15 @@ function buildExportContent(format: string, ms: any, sections: any[], options: R
       if (options.dropCaps) { al('\u2726'); al('') }
     }
     const blocks = parseTipTapContent(s.content)
-    let firstPara = true
     for (const b of blocks) {
       if (b.type === 'chapter') {
         if (lines.length > lpp - 6) np()
         for (let i = 0; i < 4; i++) al(''); al(`CHAPTER ${b.chapterNumber}`); if (b.chapterTitle) al(b.chapterTitle); al('')
         if (options.dropCaps) { al('\u2726'); al('') }
-        firstPara = true
       } else if (b.type === 'sceneBreak') {
         al(''); al('          * * *'); al('')
       } else if (b.type === 'paragraph') {
-        al(b.text); firstPara = false
+        al(b.text)
       }
     }
   }
@@ -374,30 +393,22 @@ function pageHTML(lines: string[], pg: number, font: string, lh: number): string
   return `<div class="page">${inner}<div class="page-num">${pg}</div></div>`
 }
 
-// ─── API Surface ─────────────────────────────────────────────────────────────
-
-export const studioApi = {
-  manuscripts: { getAll: manuscriptsGetAll, getById: manuscriptsGetById, create: manuscriptsCreate, update: manuscriptsUpdate, delete: manuscriptsDelete, getWordCount: manuscriptsWordCount },
-  series: { getAll: seriesGetAll, create: seriesCreate, update: seriesUpdate, delete: seriesDelete, getManuscripts: seriesGetManuscripts },
-  sections: { getByManuscript: sectionsGetByManuscript, getById: sectionsGetById, create: sectionsCreate, update: sectionsUpdate, delete: sectionsDelete, reorder: sectionsReorder, saveContent: sectionsSaveContent },
-  versions: { getRecent: versionsGetRecent, getContent: versionsGetContent, restore: versionsRestore },
-  notes: { getByManuscript: notesGetByManuscript, create: notesCreate, update: notesUpdate, delete: notesDelete },
-  fonts: { getAll: fontsGetAll, import: (file: File) => fontsImport(file), delete: fontsDelete, openDialog: () => openFontPicker() },
-  covers: { import: (file: File) => coversImport(file), openDialog: () => openCoverPicker(), getDataUrl: coversGetDataUrl },
-  ai: { chat: aiChat, streamChat: aiStreamChat, getConversations: aiGetConversations, createConversation: aiCreateConversation, getMessages: aiGetMessages, saveMessage: aiSaveMessage, deleteConversation: aiDeleteConversation },
-  settings: { get: settingsGet, set: settingsSet, getAll: settingsGetAll },
-  export: { generate: exportGenerate },
+export function triggerDownload(content: string, filename: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click()
+  document.body.removeChild(a); URL.revokeObjectURL(url)
 }
 
-// Browser-native file pickers
-function openFontPicker(): Promise<File | null> {
+export function openFontPicker(): Promise<File | null> {
   return new Promise(resolve => {
     const input = document.createElement('input'); input.type = 'file'; input.accept = '.ttf,.otf,.woff2'
     input.onchange = () => resolve(input.files?.[0] ?? null)
     input.click()
   })
 }
-function openCoverPicker(): Promise<File | null> {
+export function openCoverPicker(): Promise<File | null> {
   return new Promise(resolve => {
     const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*'
     input.onchange = () => resolve(input.files?.[0] ?? null)

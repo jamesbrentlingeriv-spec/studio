@@ -9,8 +9,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'favicon-16x16.png', 'favicon-32x32.png',
-        'apple-touch-icon.png', 'android-chrome-192x192.png', 'android-chrome-512x512.png',
-        'ns.svg', 'ns.png'],
+        'apple-touch-icon.png', 'android-chrome-192x192.png', 'android-chrome-512x512.png'],
       manifest: {
         name: 'Novel Writing Studio',
         short_name: 'N.S. Studio',

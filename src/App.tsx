@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useStudioStore } from '@/store/useStudioStore'
+import { useAuth } from '@/contexts/AuthContext'
 import AppSidebar from '@/components/sidebar/AppSidebar'
 import BookShelf from '@/components/shelf/BookShelf'
 import StudioEditor from '@/components/editor/StudioEditor'
@@ -18,6 +19,8 @@ export default function App() {
     fetchSettings,
     isChatOpen,
   } = useStudioStore()
+
+  const { user, logout } = useAuth()
 
   // Load everything on mount
   useEffect(() => {
