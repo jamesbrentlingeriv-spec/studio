@@ -2,7 +2,8 @@ import { initializeApp } from "firebase/app";
 import {
   getAuth,
   GoogleAuthProvider,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   type User,
@@ -51,8 +52,20 @@ const googleProvider = new GoogleAuthProvider();
 // ─── Auth helpers ──────────────────────────────────────────────────────────────
 
 export async function signInWithGoogle(): Promise<User> {
-  const result = await signInWithPopup(auth, googleProvider);
-  return result.user;
+  await signInWithRedirect(auth, googleProvider);
+  // Redirect means we navigate away — this promise never resolves normally.
+  // The result is picked up by getRedirectResult on page reload.
+  throw new Error('Redirecting to Google...');
+}
+
+export async function handleRedirectResult(): Promise<User | null> {
+  try {
+    const result = await getRedirectResult(auth);
+    return result?.user ?? null;
+  } catch (err) {
+    console.error('Redirect sign-in error:', err);
+    return null;
+  }
 }
 
 export async function signOut(): Promise<void> {

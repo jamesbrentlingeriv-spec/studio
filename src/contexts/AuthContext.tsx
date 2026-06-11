@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { onAuthChange, signInWithGoogle, signOut, type User } from "@/lib/firebase";
+import { onAuthChange, signInWithGoogle, handleRedirectResult, signOut, type User } from "@/lib/firebase";
 import { createFirestoreApi } from "@/lib/firestoreData";
 import { setStudioApi } from "@/lib/studioApi";
 
@@ -25,6 +25,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [api, setApi] = useState<ReturnType<typeof createFirestoreApi> | null>(null);
 
   useEffect(() => {
+    // Check redirect result first (in case we're coming back from Google)
+    handleRedirectResult().then((redirectUser) => {
+      if (redirectUser) {
+        // onAuthChange will pick this up, but we can set it immediately
+        setUser(redirectUser);
+        const firestoreApi = createFirestoreApi(redirectUser.uid);
+        setApi(firestoreApi);
+        setStudioApi(firestoreApi);
+      }
+      setLoading(false);
+    }).catch(() => {
+      setLoading(false);
+    });
+
     const unsub = onAuthChange((fbUser) => {
       setUser(fbUser);
       if (fbUser) {
@@ -44,8 +58,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     try {
       await signInWithGoogle();
-      // The onAuthChange listener will update user & api
-    } catch (err) {
+      // signInWithGoogle throws because it redirects the page;
+      // the result will be picked up by handleRedirectResult on reload.
+    } catch (err: any) {
+      // Expected: "Redirecting to Google..." — the page is navigating away
+      if (err?.message?.includes('Redirecting')) {
+        // Don't reset loading — we're navigating away
+        return;
+      }
       console.error("Login failed:", err);
       setLoading(false);
       throw err;
