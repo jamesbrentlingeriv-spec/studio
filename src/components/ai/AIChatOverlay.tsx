@@ -50,8 +50,21 @@ export default function AIChatOverlay() {
   const [showModelPicker, setShowModelPicker] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   const selectedModel = settings.openrouter_model ?? 'mistralai/mistral-7b-instruct:free'
+
+  // Play/pause video based on AI loading state
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    if (isAILoading) {
+      video.currentTime = 0
+      video.play().catch(() => {})
+    } else {
+      video.pause()
+    }
+  }, [isAILoading])
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -174,6 +187,31 @@ export default function AIChatOverlay() {
               ))}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Chathead — still image by default, animated video while AI responds */}
+      <div className="relative flex-shrink-0 border-b border-sidebar-border bg-gradient-to-b from-[#0d1117] to-[#1a1f2e]">
+        <div className="relative w-full aspect-video overflow-hidden">
+          {/* Still image — hidden while loading */}
+          <img
+            src="/chathead.jpeg"
+            alt="AI Assistant"
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${isAILoading ? 'opacity-0' : 'opacity-100'}`}
+          />
+          {/* Animated video — shown while loading, looped */}
+          <video
+            ref={videoRef}
+            src="/chathead.mp4"
+            muted
+            loop
+            playsInline
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${isAILoading ? 'opacity-100' : 'opacity-0'}`}
+          />
+        </div>
+        {/* Pulse ring at bottom to indicate activity */}
+        <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-3 h-3 rounded-full border-2 border-sidebar-border bg-sidebar-bg transition-all duration-300 ${isAILoading ? 'scale-125 border-brand bg-brand/20' : ''}`}>
+          <div className={`absolute inset-0 rounded-full transition-opacity duration-300 ${isAILoading ? 'opacity-100 animate-ping' : 'opacity-0'} bg-brand/40`} />
         </div>
       </div>
 
