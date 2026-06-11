@@ -496,8 +496,13 @@ export function createFirestoreApi(uid: string) {
   // ── Covers ─────────────────────────────────────────────────────────────
 
   async function coversGetDataUrl(coverKey: string): Promise<string> {
-    const existing = localStorage.getItem(`cover:${coverKey}`);
+    // coverKey is already the full storage key (e.g. "cover:1730:file.jpg")
+    const existing = localStorage.getItem(coverKey);
     if (existing) return existing;
+    try {
+      const existing2 = localStorage.getItem(`cover:${coverKey}`);
+      if (existing2) return existing2;
+    } catch { /* ignore */ }
     return coverKey.startsWith("data:") ? coverKey : "";
   }
 

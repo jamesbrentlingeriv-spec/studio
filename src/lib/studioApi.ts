@@ -106,6 +106,33 @@ export interface StudioApi {
 
 // ─── Compatibility wrapper ────────────────────────────────────────────────────
 
+// ─── Field name converter: camelCase → snake_case for backwards compat ────────
+
+const KEY_MAP: Record<string, string> = {
+  seriesId: 'series_id', seriesOrder: 'series_order', coverPath: 'cover_path',
+  trimSize: 'trim_size', exportFont: 'export_font', targetWords: 'target_words',
+  wordCount: 'word_count', createdAt: 'created_at', updatedAt: 'updated_at',
+  manuscriptId: 'manuscript_id', parentId: 'parent_id', isIncluded: 'is_included',
+  positionX: 'position_x', positionY: 'position_y',
+  familyName: 'family_name', fileName: 'file_name', dataBase64: 'data_base64',
+  filePath: 'file_path', conversationId: 'conversation_id', modelUsed: 'model_used',
+  savedAt: 'saved_at',
+}
+
+function toSnake(obj: any): any {
+  if (Array.isArray(obj)) return obj.map(toSnake)
+  if (obj === null || obj === undefined || typeof obj !== 'object') return obj
+  if (obj.toDate || obj.seconds) return obj // Timestamp — leave as-is
+  const out: any = {}
+  for (const [key, value] of Object.entries(obj)) {
+    const mappedKey = KEY_MAP[key] ?? key
+    out[mappedKey] = toSnake(value)
+  }
+  return out
+}
+
+// ─── Compatibility wrapper ────────────────────────────────────────────────────
+
 export const studioApi: StudioApi = new Proxy({} as any, {
   get(_target, prop: string) {
     if (!_api) {
@@ -118,9 +145,9 @@ export const studioApi: StudioApi = new Proxy({} as any, {
     const api = _api as any
     if (prop === 'manuscripts') {
       return {
-        getAll: () => api.manuscripts.getAll(),
-        getById: (id: Id) => api.manuscripts.getById(String(id)),
-        create: (data: any) => api.manuscripts.create(data),
+        getAll: async () => toSnake(await api.manuscripts.getAll()),
+        getById: async (id: Id) => toSnake(await api.manuscripts.getById(String(id))),
+        create: async (data: any) => toSnake(await api.manuscripts.create(data)),
         update: (id: Id, data: any) => api.manuscripts.update(String(id), data),
         delete: (id: Id) => api.manuscripts.delete(String(id)),
         getWordCount: () => 0,
@@ -128,8 +155,8 @@ export const studioApi: StudioApi = new Proxy({} as any, {
     }
     if (prop === 'series') {
       return {
-        getAll: () => api.series.getAll(),
-        create: (data: any) => api.series.create(data),
+        getAll: async () => toSnake(await api.series.getAll()),
+        create: async (data: any) => toSnake(await api.series.create(data)),
         update: (id: Id, data: any) => api.series.update(String(id), data),
         delete: (id: Id) => api.series.delete(String(id)),
         getManuscripts: () => [],
@@ -140,19 +167,19 @@ export const studioApi: StudioApi = new Proxy({} as any, {
         getByManuscript: async (msId: Id) => {
           const result = await api.sections.getByManuscript(String(msId))
           for (const s of result) sectionToMsCache.set(String(s.id), String(msId))
-          return result
+          return toSnake(result)
         },
         getById: async (id: Id) => {
           const msId = sectionToMsCache.get(String(id)) ?? ''
-          return msId ? api.sections.getById(msId, String(id)) : null
+          const r = msId ? await api.sections.getById(msId, String(id)) : null
+          return toSnake(r)
         },
         create: async (data: any) => {
           const result = await api.sections.create(data)
           const msId = data.manuscript_id ?? data.manuscriptId ?? ''
           sectionToMsCache.set(String(result.id), String(msId))
-          return result
+          return toSnake(result)
         },
-        // OLD calling convention: update(id, data) — resolve msId from cache
         update: async (id: Id, data: any) => {
           const sid = String(id)
           let msId = sectionToMsCache.get(sid)
@@ -160,7 +187,6 @@ export const studioApi: StudioApi = new Proxy({} as any, {
           if (!msId && data.manuscriptId) msId = String(data.manuscriptId)
           if (msId) await api.sections.update(msId, sid, data)
         },
-        // OLD convention: delete(id)
         delete: async (id: Id) => {
           const sid = String(id)
           const msId = sectionToMsCache.get(sid) ?? ''
@@ -171,7 +197,6 @@ export const studioApi: StudioApi = new Proxy({} as any, {
           const msId = sectionToMsCache.get(sid) ?? ''
           if (msId) await api.sections.reorder(msId, sid, newPos, newParentId ?? null)
         },
-        // OLD convention: saveContent(id, content, wordCount)
         saveContent: async (sectionId: Id, content: string, wordCount: number) => {
           const sid = String(sectionId)
           const msId = sectionToMsCache.get(sid) ?? ''
@@ -184,11 +209,9 @@ export const studioApi: StudioApi = new Proxy({} as any, {
         getRecent: async (sectionId: Id, limit: number) => {
           const sid = String(sectionId)
           const msId = sectionToMsCache.get(sid) ?? ''
-          return msId ? api.versions.getRecent(msId, sid, limit) : []
+          return msId ? toSnake(await api.versions.getRecent(msId, sid, limit)) : []
         },
         getContent: async (versionId: Id) => {
-          // This is tricky — need both msId and sectionId
-          // Try scanning cache
           for (const [sId, mId] of sectionToMsCache) {
             const content = await api.versions.getContent(mId, sId, String(versionId))
             if (content) return content
@@ -203,16 +226,14 @@ export const studioApi: StudioApi = new Proxy({} as any, {
         getByManuscript: async (msId: Id) => {
           const result = await api.notes.getByManuscript(String(msId))
           for (const n of result) noteToMsCache.set(String(n.id), String(msId))
-          return result
+          return toSnake(result)
         },
-        // OLD convention: create(data) — manuscript_id inside data
         create: async (data: any) => {
           const msId = data.manuscript_id ?? data.manuscriptId ?? ''
           const result = await api.notes.create(String(msId), data)
           noteToMsCache.set(String(result.id), String(msId))
-          return result
+          return toSnake(result)
         },
-        // OLD convention: update(id, data) — resolve msId from cache
         update: async (id: Id, data: any) => {
           const nid = String(id)
           let msId = noteToMsCache.get(nid)
@@ -220,7 +241,6 @@ export const studioApi: StudioApi = new Proxy({} as any, {
           if (!msId && data.manuscriptId) msId = String(data.manuscriptId)
           if (msId) await api.notes.update(msId, nid, data)
         },
-        // OLD convention: delete(id)
         delete: async (id: Id) => {
           const nid = String(id)
           const msId = noteToMsCache.get(nid) ?? ''
@@ -230,8 +250,8 @@ export const studioApi: StudioApi = new Proxy({} as any, {
     }
     if (prop === 'fonts') {
       return {
-        getAll: () => api.fonts.getAll(),
-        import: (file: File) => api.fonts.import(file),
+        getAll: async () => toSnake(await api.fonts.getAll()),
+        import: async (file: File) => toSnake(await api.fonts.import(file)),
         delete: (id: Id) => api.fonts.delete(String(id)),
         openDialog: () => openFontPicker(),
       }
@@ -247,10 +267,10 @@ export const studioApi: StudioApi = new Proxy({} as any, {
       return {
         chat: async () => '',
         streamChat: async () => {},
-        getConversations: (manuscriptId?: Id) => api.ai.getConversations(manuscriptId ? String(manuscriptId) : undefined),
-        createConversation: (manuscriptId?: Id, title?: string) => api.ai.createConversation(manuscriptId ? String(manuscriptId) : undefined, title),
-        getMessages: (conversationId: Id) => api.ai.getMessages(String(conversationId)),
-        saveMessage: (conversationId: Id, role: string, content: string, model?: string) => api.ai.saveMessage(String(conversationId), role, content, model),
+        getConversations: async (manuscriptId?: Id) => toSnake(await api.ai.getConversations(manuscriptId ? String(manuscriptId) : undefined)),
+        createConversation: async (manuscriptId?: Id, title?: string) => toSnake(await api.ai.createConversation(manuscriptId ? String(manuscriptId) : undefined, title)),
+        getMessages: async (conversationId: Id) => toSnake(await api.ai.getMessages(String(conversationId))),
+        saveMessage: async (conversationId: Id, role: string, content: string, model?: string) => toSnake(await api.ai.saveMessage(String(conversationId), role, content, model)),
         deleteConversation: (id: Id) => api.ai.deleteConversation(String(id)),
       }
     }
@@ -258,7 +278,7 @@ export const studioApi: StudioApi = new Proxy({} as any, {
       return {
         get: () => null,
         set: (key: string, value: string) => api.settings.set(key, value),
-        getAll: () => api.settings.getAll(),
+        getAll: async () => await api.settings.getAll(),
       }
     }
     if (prop === 'export') {
