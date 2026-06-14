@@ -43,7 +43,7 @@ export default function SplashScreen({ onFinished }: SplashScreenProps) {
 
   return (
     <div
-      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#1a1f2e] transition-all duration-700 ease-in-out ${
+      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#000000] transition-all duration-700 ease-in-out ${
         fadeOut ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >
@@ -54,8 +54,7 @@ export default function SplashScreen({ onFinished }: SplashScreenProps) {
           <img
             src="/ns.svg"
             alt="N.S. Studio"
-            className="w-full h-full object-contain drop-shadow-2xl"
-            style={{ filter: 'brightness(0) invert(1)' }}
+            className="w-full h-full object-contain drop-shadow-2xl brightness-0 invert"
           />
         </div>
 
@@ -71,9 +70,9 @@ export default function SplashScreen({ onFinished }: SplashScreenProps) {
 
         {/* Loading bar */}
         <div className="w-48 mt-4">
-          <div className="h-1 bg-[#2d3650] rounded-full overflow-hidden">
+          <div className="h-1 bg-neutral-800 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-brand to-brand-light rounded-full transition-all duration-300 ease-out"
+              className="h-full bg-white rounded-full transition-all duration-300 ease-out"
               style={{ width: `${displayProgress}%` }}
             />
           </div>

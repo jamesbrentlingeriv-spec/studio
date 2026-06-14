@@ -21,7 +21,7 @@ interface Props {
 }
 
 export default function NewBookModal({ onClose }: Props) {
-  const { createManuscript, createSeries, series, setActiveManuscript, setView } = useStudioStore()
+  const { createManuscript, createSection, createSeries, series, setActiveManuscript, setView } = useStudioStore()
 
   const [step, setStep] = useState<1 | 2>(1)
   const [title, setTitle] = useState('')
@@ -38,6 +38,115 @@ export default function NewBookModal({ onClose }: Props) {
   const [coverPath, setCoverPath] = useState<string | null>(null)
   const [coverPreview, setCoverPreview] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
+
+  const [importedSections, setImportedSections] = useState<{ title: string; content: string; type: string }[] | null>(null)
+  const [importStatus, setImportStatus] = useState<string | null>(null)
+
+  function textToTipTapJson(text: string): string {
+    const paragraphs = text.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
+    return JSON.stringify({
+      type: 'doc',
+      content: paragraphs.map(p => ({
+        type: 'paragraph',
+        content: p ? [{ type: 'text', text: p }] : []
+      }))
+    });
+  }
+
+  async function handleFileImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "")
+      const text = await file.text()
+
+      if (file.name.endsWith('.json')) {
+        try {
+          const data = JSON.parse(text)
+          setTitle(data.title || nameWithoutExt)
+          setAuthor(data.author || '')
+          setGenre(data.genre || '')
+          if (Array.isArray(data.sections)) {
+            const mapped = data.sections.map((s: any) => ({
+              title: s.title || 'Untitled Section',
+              content: typeof s.content === 'string'
+                ? (s.content.startsWith('{') ? s.content : textToTipTapJson(s.content))
+                : JSON.stringify(s.content || {}),
+              type: s.type || 'chapter',
+            }))
+            setImportedSections(mapped)
+            setImportStatus(`Loaded ${mapped.length} sections from JSON`)
+          } else {
+            setImportedSections([{ title: 'Manuscript', content: textToTipTapJson(text), type: 'chapter' }])
+            setImportStatus(`Loaded 1 section from JSON`)
+          }
+          return
+        } catch {
+          alert("Invalid JSON format. Importing as raw text instead.")
+        }
+      }
+
+      // Parse text/markdown
+      const lines = text.split('\n')
+      const sections: { title: string; paragraphs: string[]; type: string }[] = []
+      let currentSection = { title: 'Chapter 1', paragraphs: [] as string[], type: 'chapter' }
+
+      const isHeader = (line: string) => {
+        const trimmed = line.trim()
+        if (trimmed.startsWith('#')) return true
+        if (/^(chapter|prologue|epilogue|introduction|preface|afterword|acknowledgments)\b/i.test(trimmed)) return true
+        return false
+      }
+
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (!trimmed) continue
+
+        if (isHeader(line)) {
+          if (currentSection.paragraphs.length > 0 || currentSection.title !== 'Chapter 1') {
+            sections.push(currentSection)
+          }
+          const titleText = trimmed.replace(/^#+\s*/, '')
+          let secType = 'chapter'
+          if (/prologue/i.test(titleText)) secType = 'preface'
+          else if (/epilogue/i.test(titleText)) secType = 'epilogue'
+          else if (/introduction/i.test(titleText)) secType = 'introduction'
+
+          currentSection = {
+            title: titleText || `Chapter ${sections.length + 1}`,
+            paragraphs: [],
+            type: secType,
+          }
+        } else {
+          currentSection.paragraphs.push(trimmed)
+        }
+      }
+
+      if (currentSection.paragraphs.length > 0 || sections.length === 0) {
+        sections.push(currentSection)
+      }
+
+      const mappedSections = sections.map(sec => ({
+        title: sec.title,
+        content: JSON.stringify({
+          type: 'doc',
+          content: sec.paragraphs.map(p => ({
+            type: 'paragraph',
+            content: p ? [{ type: 'text', text: p }] : [],
+          })),
+        }),
+        type: sec.type,
+      }))
+
+      setTitle(nameWithoutExt)
+      setImportedSections(mappedSections)
+      setImportStatus(`Loaded ${mappedSections.length} sections from document`)
+    } catch (err) {
+      console.error(err)
+      alert("Failed to parse file")
+    }
+  }
 
   async function handleCoverUpload() {
     const filePath = await studioApi.covers.openDialog()
@@ -71,6 +180,21 @@ export default function NewBookModal({ onClose }: Props) {
         series_id: finalSeriesId ?? undefined,
         series_order: seriesOrder,
       })
+
+      // If we have imported sections, create them
+      if (importedSections && importedSections.length > 0) {
+        for (let i = 0; i < importedSections.length; i++) {
+          const sec = importedSections[i]
+          await createSection({
+            manuscript_id: ms.id,
+            title: sec.title,
+            content: sec.content,
+            type: sec.type,
+            position: i,
+            is_included: 1,
+          })
+        }
+      }
 
       // Immediately open the new manuscript
       setActiveManuscript(ms)
@@ -110,6 +234,30 @@ export default function NewBookModal({ onClose }: Props) {
         <div className="px-6 py-5 space-y-4 max-h-[65vh] overflow-y-auto allow-select">
           {step === 1 && (
             <>
+              {/* Import Section */}
+              <div className="flex items-center justify-between p-4 bg-neutral-50 border border-dashed border-neutral-200 rounded-xl mb-2">
+                <div className="mr-4">
+                  <h4 className="text-sm font-semibold text-neutral-800">Import an existing manuscript?</h4>
+                  <p className="text-xs text-neutral-500">Support for TXT, Markdown (.md), or JSON files.</p>
+                </div>
+                <label className="flex items-center gap-2 px-3 py-1.5 bg-[#1a1f2e] hover:bg-[#252c3f] text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors shadow-sm whitespace-nowrap">
+                  <Upload size={13} />
+                  Choose File
+                  <input
+                    type="file"
+                    accept=".txt,.md,.json"
+                    className="hidden"
+                    onChange={handleFileImport}
+                  />
+                </label>
+              </div>
+
+              {importStatus && (
+                <div className="text-xs font-medium text-emerald-600 bg-emerald-50 border border-emerald-100 px-3 py-2 rounded-lg">
+                  ✓ {importStatus}
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
                 <input
@@ -214,7 +362,7 @@ export default function NewBookModal({ onClose }: Props) {
                     onClick={handleCoverUpload}
                     className="w-24 h-36 rounded-lg border-2 border-dashed border-gray-200 hover:border-brand
                       flex flex-col items-center justify-center cursor-pointer transition-colors
-                      bg-gray-50 hover:bg-blue-50 flex-shrink-0 overflow-hidden"
+                      bg-gray-50 hover:bg-neutral-100 flex-shrink-0 overflow-hidden"
                   >
                     {coverPreview ? (
                       <img src={coverPreview} alt="Cover preview" className="w-full h-full object-cover" />

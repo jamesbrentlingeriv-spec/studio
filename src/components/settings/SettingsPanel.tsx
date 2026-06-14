@@ -31,7 +31,7 @@ export default function SettingsPanel() {
   }
 
   return (
-    <div className="h-full bg-[#f8f7f4] overflow-y-auto">
+    <div className="h-full bg-white overflow-y-auto">
       <div className="max-w-2xl mx-auto px-8 py-8 space-y-8">
 
         <div>

@@ -3,20 +3,20 @@ import { useStudioStore, type Manuscript } from '@/store/useStudioStore'
 import { BookOpen, MoreVertical, Trash2, Pencil } from 'lucide-react'
 
 const STATUS_COLORS: Record<string, string> = {
-  idea: 'bg-purple-100 text-purple-700',
-  drafting: 'bg-blue-100 text-blue-700',
-  revising: 'bg-amber-100 text-amber-700',
-  complete: 'bg-green-100 text-green-700',
-  published: 'bg-emerald-100 text-emerald-700',
+  idea: 'bg-neutral-100 text-neutral-600',
+  drafting: 'bg-neutral-200 text-neutral-800',
+  revising: 'bg-neutral-300 text-neutral-900',
+  complete: 'bg-neutral-800 text-white',
+  published: 'bg-black text-white',
 }
 
 const COVER_PLACEHOLDERS = [
-  'from-violet-600 to-indigo-800',
-  'from-rose-600 to-pink-800',
-  'from-amber-600 to-orange-800',
-  'from-teal-600 to-cyan-800',
-  'from-blue-600 to-indigo-900',
-  'from-green-600 to-emerald-800',
+  'from-neutral-200 to-neutral-400',
+  'from-neutral-300 to-neutral-500',
+  'from-neutral-400 to-neutral-600',
+  'from-neutral-500 to-neutral-700',
+  'from-neutral-600 to-neutral-800',
+  'from-neutral-700 to-neutral-900',
 ]
 
 interface Props {

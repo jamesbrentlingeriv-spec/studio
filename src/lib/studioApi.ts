@@ -131,6 +131,23 @@ function toSnake(obj: any): any {
   return out
 }
 
+const INVERSE_KEY_MAP: Record<string, string> = {}
+for (const [camel, snake] of Object.entries(KEY_MAP)) {
+  INVERSE_KEY_MAP[snake] = camel
+}
+
+function toCamel(obj: any): any {
+  if (Array.isArray(obj)) return obj.map(toCamel)
+  if (obj === null || obj === undefined || typeof obj !== 'object') return obj
+  if (obj instanceof File || obj instanceof Blob || obj.constructor?.name === 'File' || obj.constructor?.name === 'Blob') return obj
+  const out: any = {}
+  for (const [key, value] of Object.entries(obj)) {
+    const mappedKey = INVERSE_KEY_MAP[key] ?? key
+    out[mappedKey] = toCamel(value)
+  }
+  return out
+}
+
 // ─── Compatibility wrapper ────────────────────────────────────────────────────
 
 export const studioApi: StudioApi = new Proxy({} as any, {
@@ -147,8 +164,8 @@ export const studioApi: StudioApi = new Proxy({} as any, {
       return {
         getAll: async () => toSnake(await api.manuscripts.getAll()),
         getById: async (id: Id) => toSnake(await api.manuscripts.getById(String(id))),
-        create: async (data: any) => toSnake(await api.manuscripts.create(data)),
-        update: (id: Id, data: any) => api.manuscripts.update(String(id), data),
+        create: async (data: any) => toSnake(await api.manuscripts.create(toCamel(data))),
+        update: (id: Id, data: any) => api.manuscripts.update(String(id), toCamel(data)),
         delete: (id: Id) => api.manuscripts.delete(String(id)),
         getWordCount: () => 0,
       }
@@ -156,8 +173,8 @@ export const studioApi: StudioApi = new Proxy({} as any, {
     if (prop === 'series') {
       return {
         getAll: async () => toSnake(await api.series.getAll()),
-        create: async (data: any) => toSnake(await api.series.create(data)),
-        update: (id: Id, data: any) => api.series.update(String(id), data),
+        create: async (data: any) => toSnake(await api.series.create(toCamel(data))),
+        update: (id: Id, data: any) => api.series.update(String(id), toCamel(data)),
         delete: (id: Id) => api.series.delete(String(id)),
         getManuscripts: () => [],
       }
@@ -175,7 +192,7 @@ export const studioApi: StudioApi = new Proxy({} as any, {
           return toSnake(r)
         },
         create: async (data: any) => {
-          const result = await api.sections.create(data)
+          const result = await api.sections.create(toCamel(data))
           const msId = data.manuscript_id ?? data.manuscriptId ?? ''
           sectionToMsCache.set(String(result.id), String(msId))
           return toSnake(result)
@@ -185,7 +202,7 @@ export const studioApi: StudioApi = new Proxy({} as any, {
           let msId = sectionToMsCache.get(sid)
           if (!msId && data.manuscript_id) msId = String(data.manuscript_id)
           if (!msId && data.manuscriptId) msId = String(data.manuscriptId)
-          if (msId) await api.sections.update(msId, sid, data)
+          if (msId) await api.sections.update(msId, sid, toCamel(data))
         },
         delete: async (id: Id) => {
           const sid = String(id)
@@ -230,7 +247,7 @@ export const studioApi: StudioApi = new Proxy({} as any, {
         },
         create: async (data: any) => {
           const msId = data.manuscript_id ?? data.manuscriptId ?? ''
-          const result = await api.notes.create(String(msId), data)
+          const result = await api.notes.create(String(msId), toCamel(data))
           noteToMsCache.set(String(result.id), String(msId))
           return toSnake(result)
         },
@@ -239,7 +256,7 @@ export const studioApi: StudioApi = new Proxy({} as any, {
           let msId = noteToMsCache.get(nid)
           if (!msId && data.manuscript_id) msId = String(data.manuscript_id)
           if (!msId && data.manuscriptId) msId = String(data.manuscriptId)
-          if (msId) await api.notes.update(msId, nid, data)
+          if (msId) await api.notes.update(msId, nid, toCamel(data))
         },
         delete: async (id: Id) => {
           const nid = String(id)

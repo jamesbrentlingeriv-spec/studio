@@ -107,7 +107,7 @@ export default function ManuscriptNavigator() {
           group flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer
           text-xs transition-all
           ${isActive
-            ? 'bg-brand/15 text-brand'
+            ? 'bg-neutral-800 text-white'
             : 'text-sidebar-text hover:bg-sidebar-hover hover:text-white'
           }
         `}
@@ -180,7 +180,7 @@ export default function ManuscriptNavigator() {
   }
 
   return (
-    <div className="w-48 flex-shrink-0 bg-sidebar-bg border-r border-sidebar-border flex flex-col h-full">
+    <div className="chapters-sidebar w-48 flex-shrink-0 bg-sidebar-bg border-r border-sidebar-border flex flex-col h-full">
       {/* Navigator Header */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-sidebar-border flex-shrink-0">
         <span className="text-[10px] font-bold uppercase tracking-widest text-sidebar-text/60">

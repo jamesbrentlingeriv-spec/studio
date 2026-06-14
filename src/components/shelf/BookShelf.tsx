@@ -46,7 +46,7 @@ export default function BookShelf() {
   const totalWords = manuscripts.reduce((sum, ms) => sum + (ms.word_count ?? 0), 0)
 
   return (
-    <div className="h-full flex flex-col bg-[#f8f7f4]">
+    <div className="h-full flex flex-col bg-white">
       {/* Shelf Header */}
       <div className="border-b border-panel-border bg-white px-8 py-5 flex items-center justify-between flex-shrink-0">
         <div>

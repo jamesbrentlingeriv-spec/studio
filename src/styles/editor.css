@@ -8,7 +8,7 @@
   flex-direction: column;
   align-items: center;
   padding: 40px 24px 120px;
-  background: #ede9e1;
+  background: #ffffff;
   transition: background 0.4s ease;
 }
 
@@ -16,7 +16,7 @@
 .tiptap-page {
   width: 100%;
   max-width: 640px;
-  background: #fffdf8;
+  background: #ffffff;
   box-shadow:
     0 1px 3px rgba(0,0,0,0.04),
     0 4px 20px rgba(0,0,0,0.06),
@@ -30,13 +30,13 @@
 /* Dark mode paper — studio.jpg inspired warm dark */
 .dark .tiptap-editor-wrapper,
 .focus-mode-dark .tiptap-editor-wrapper {
-  background: #1a1a1a;
+  background: #ffffff;
 }
 
 .dark .tiptap-page,
 .focus-mode-dark .tiptap-page {
-  background: #222;
-  color: #d4c9b0;
+  background: #ffffff;
+  color: #000000;
   box-shadow:
     0 1px 2px rgba(0,0,0,0.2),
     0 4px 16px rgba(0,0,0,0.3),
@@ -49,7 +49,7 @@
   outline: none;
   font-size: 13.5pt;
   line-height: 1.9;
-  color: #2a2218;
+  color: #000000;
   font-family: 'Georgia', 'Palatino', 'Book Antiqua', Cambria, serif;
   word-break: break-word;
   transition: color 0.3s ease;
@@ -57,7 +57,7 @@
 
 .dark .ProseMirror,
 .focus-mode-dark .ProseMirror {
-  color: #c8baa0;
+  color: #000000;
 }
 
 .ProseMirror p {

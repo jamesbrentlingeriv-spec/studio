@@ -152,7 +152,7 @@ export default function StudioEditor() {
         )}
 
         {/* Editor Canvas */}
-        <div className="flex-1 overflow-hidden tiptap-editor-wrapper">
+        <div className="flex-1 overflow-y-auto tiptap-editor-wrapper">
           {activeSectionId ? (
             <div className="tiptap-page">
               <EditorContent editor={editor} />

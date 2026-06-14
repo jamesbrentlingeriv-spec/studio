@@ -57,7 +57,7 @@ export default function AppSidebar() {
               }
             `}
           >
-            <span className={currentView === item.id ? 'text-brand' : 'text-sidebar-text'}>
+            <span className={currentView === item.id ? 'text-white' : 'text-sidebar-text'}>
               {item.icon}
             </span>
             {item.label}

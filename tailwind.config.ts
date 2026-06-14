@@ -9,42 +9,42 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Sidebar navy palette (matching design reference)
+        // Sidebar monochromatic black palette
         sidebar: {
-          bg: '#1a1f2e',
-          hover: '#252c3d',
-          active: '#2d3650',
-          border: '#2a3148',
-          text: '#a8b3cf',
+          bg: '#000000',
+          hover: '#1f1f1f',
+          active: '#2e2e2e',
+          border: '#222222',
+          text: '#8c8c8c',
           'text-active': '#ffffff',
-          accent: '#4f6ef7',
+          accent: '#ffffff',
         },
-        // Editor canvas
+        // Editor canvas (white and greyscale)
         canvas: {
-          bg: '#f8f7f4',
-          'bg-dark': '#1e1e1e',
+          bg: '#ffffff',
+          'bg-dark': '#ffffff',
           paper: '#ffffff',
-          'paper-dark': '#2a2a2a',
-          border: '#e5e2dc',
+          'paper-dark': '#ffffff',
+          border: '#e5e5e5',
         },
         // Typesetter panel
         panel: {
-          bg: '#f0ede8',
-          'bg-dark': '#252525',
-          border: '#d9d4cc',
+          bg: '#ffffff',
+          'bg-dark': '#ffffff',
+          border: '#e5e5e5',
         },
         // AI chat
         ai: {
-          bubble: '#4f6ef7',
-          'bubble-text': '#ffffff',
-          user: '#f0f4ff',
-          'user-text': '#1a1f2e',
+          bubble: '#f3f4f6',
+          'bubble-text': '#000000',
+          user: '#000000',
+          'user-text': '#ffffff',
         },
         // Accent / brand
         brand: {
-          DEFAULT: '#4f6ef7',
-          light: '#7b95f9',
-          dark: '#3451d1',
+          DEFAULT: '#000000',
+          light: '#737373',
+          dark: '#000000',
         },
       },
       fontFamily: {

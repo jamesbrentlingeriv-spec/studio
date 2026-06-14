@@ -257,7 +257,7 @@ function CorkboardContent({ manuscript }: { manuscript: Manuscript }) {
   }
 
   return (
-    <div className="h-full flex flex-col bg-[#f8f7f4]">
+    <div className="h-full flex flex-col bg-white">
       {/* Header */}
       <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between mb-3">

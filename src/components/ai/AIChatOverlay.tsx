@@ -18,7 +18,7 @@ const MODES = [
     label: 'Publish',
     icon: <BookOpen size={13} />,
     system: 'Answer my questions about the publishing industry — both traditional and self-publishing.',
-    color: 'text-blue-600',
+    color: 'text-neutral-400',
   },
   {
     id: 'factcheck',
@@ -112,13 +112,13 @@ export default function AIChatOverlay() {
   }
 
   return (
-    <div className="fixed bottom-5 right-5 w-96 bg-[#1a1f2e] rounded-2xl shadow-chat border border-sidebar-border flex flex-col z-50 animate-slide-up overflow-hidden"
+    <div className="fixed bottom-5 right-5 w-96 bg-[#000000] rounded-2xl shadow-chat border border-sidebar-border flex flex-col z-50 animate-slide-up overflow-hidden"
       style={{ maxHeight: 'calc(100vh - 80px)' }}>
 
       {/* Chat Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-sidebar-border bg-sidebar-hover flex-shrink-0">
         <div className="flex items-center gap-2">
-          <Bot size={16} className="text-brand" />
+          <Bot size={16} className="text-white" />
           <span className="text-sm font-bold text-white">AI Assistant</span>
         </div>
         <div className="flex items-center gap-1">
@@ -167,7 +167,7 @@ export default function AIChatOverlay() {
             {selectedModel.split('/').pop()?.split(':')[0] ?? 'Model'}
           </button>
           {showModelPicker && (
-            <div className="absolute bottom-8 right-0 bg-[#1e2538] border border-sidebar-border rounded-lg shadow-xl py-1 z-50 w-56 animate-slide-up">
+            <div className="absolute bottom-8 right-0 bg-[#1f1f1f] border border-sidebar-border rounded-lg shadow-xl py-1 z-50 w-56 animate-slide-up">
               <p className="px-3 py-1 text-[10px] uppercase tracking-widest text-sidebar-text/40 font-bold">Free Models</p>
               {FREE_MODELS.map(m => (
                 <button
@@ -178,7 +178,7 @@ export default function AIChatOverlay() {
                   }}
                   className={`w-full text-left px-3 py-2 text-xs transition-colors ${
                     selectedModel === m.id
-                      ? 'text-brand font-semibold'
+                      ? 'text-white font-semibold'
                       : 'text-sidebar-text hover:text-white hover:bg-sidebar-hover'
                   }`}
                 >

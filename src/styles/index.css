@@ -25,6 +25,12 @@ body {
 /* Allow text selection inside editor and chat */
 .allow-select { user-select: text; }
 
+/* ─── Sidebars Solid Black Theme ────────────────────────────────────────────── */
+.sidebar, .chapters-sidebar {
+  background-color: #000000 !important;
+  background-image: none !important;
+}
+
 /* ─── Scrollbar ─────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

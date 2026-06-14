@@ -8,7 +8,7 @@ export default function TitleBar() {
       {/* App branding */}
       <div className="flex items-center gap-2">
         <img src="/ns.svg" alt="N.S." className="w-4 h-4 brightness-0 invert" />
-        <span className="text-brand font-bold text-sm tracking-tight">✦ Novel Studio</span>
+        <span className="text-white font-bold text-sm tracking-tight">✦ Novel Studio</span>
       </div>
 
       {/* User info + logout */}
