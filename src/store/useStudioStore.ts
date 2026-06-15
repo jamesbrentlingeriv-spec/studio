@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { studioApi } from '@/lib/studioApi'
 import { streamWithFallback, setApiKey } from '@/lib/openrouter'
+import { FREE_MODELS } from '@/lib/constants'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -323,7 +324,8 @@ export const useStudioStore = create<StudioStore>((set, get) => ({
     const { activeConversationId, aiMessages, settings } = get()
     if (!activeConversationId) return
 
-    const selectedModel = model ?? settings.openrouter_model ?? 'google/gemini-2.5-flash:free'
+    const rawModel = model ?? settings.openrouter_model ?? FREE_MODELS[0].id
+    const selectedModel = FREE_MODELS.some(m => m.id === rawModel) ? rawModel : FREE_MODELS[0].id
 
     // Save user message to DB and add to UI
     const userMsg = await studioApi.ai.saveMessage(activeConversationId, 'user', content)

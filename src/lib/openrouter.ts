@@ -34,8 +34,9 @@ export async function streamWithFallback(
     return '';
   }
 
-  // Build the fallback list: preferred model first, then remaining free models
-  const modelList = [preferredModel, ...FREE_MODELS.map(m => m.id).filter(id => id !== preferredModel)];
+  // Build the fallback list: preferred model first (if active), then remaining free models
+  const cleanPreferred = FREE_MODELS.some(m => m.id === preferredModel) ? preferredModel : FREE_MODELS[0].id;
+  const modelList = [cleanPreferred, ...FREE_MODELS.map(m => m.id).filter(id => id !== cleanPreferred)];
 
   let lastError = '';
 
