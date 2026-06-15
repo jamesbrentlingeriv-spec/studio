@@ -496,22 +496,51 @@ export function createFirestoreApi(uid: string) {
   // ── Covers ─────────────────────────────────────────────────────────────
 
   async function coversGetDataUrl(coverKey: string): Promise<string> {
-    // coverKey is already the full storage key (e.g. "cover:1730:file.jpg")
+    if (!coverKey) return "";
+    if (coverKey.startsWith("data:")) return coverKey;
+
+    // Check local storage cache first
+    const cached = localStorage.getItem(`cache:${coverKey}`);
+    if (cached) return cached;
+
+    // Fetch from Firestore
+    try {
+      const doc = await fsGet<{ dataUrl: string }>(uid, "covers", coverKey);
+      if (doc?.dataUrl) {
+        // Cache it in localStorage
+        try {
+          localStorage.setItem(`cache:${coverKey}`, doc.dataUrl);
+        } catch { /* Quota exceeded - ignore */ }
+        return doc.dataUrl;
+      }
+    } catch (e) {
+      console.error("Failed to fetch cover from Firestore:", e);
+    }
+    
+    // Check fallback legacy format keys
     const existing = localStorage.getItem(coverKey);
     if (existing) return existing;
     try {
       const existing2 = localStorage.getItem(`cover:${coverKey}`);
       if (existing2) return existing2;
     } catch { /* ignore */ }
-    return coverKey.startsWith("data:") ? coverKey : "";
+    
+    return "";
   }
 
   async function coversImport(file: File): Promise<string> {
-    const base64 = await fileToBase64(file);
-    const dataUrl = `data:${file.type};base64,${base64}`;
-    const key = `cover:${Date.now()}:${file.name}`;
-    localStorage.setItem(key, dataUrl);
-    return key;
+    const dataUrl = await compressImage(file, 400, 600);
+    const doc = await fsCreate<{ id: string }>(uid, "covers", {
+      dataUrl,
+      name: file.name,
+    });
+
+    // Save to local cache as well
+    try {
+      localStorage.setItem(`cache:${doc.id}`, dataUrl);
+    } catch { /* Quota exceeded - ignore */ }
+
+    return doc.id;
   }
 
   // ── AI Chat ────────────────────────────────────────────────────────────
@@ -666,5 +695,40 @@ function fileToBase64(file: File): Promise<string> {
     reader.onload = () => resolve((reader.result as string).split(",")[1]);
     reader.onerror = reject;
     reader.readAsDataURL(file);
+  });
+}
+
+function compressImage(file: File, maxW: number, maxH: number): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxW) {
+            height = Math.round((height * maxW) / width);
+            width = maxW;
+          }
+        } else {
+          if (height > maxH) {
+            width = Math.round((width * maxH) / height);
+            height = maxH;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
+        resolve(dataUrl);
+      };
+    };
   });
 }

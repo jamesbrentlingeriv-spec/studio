@@ -125,13 +125,13 @@ export default function AIChatOverlay() {
           <button
             onClick={() => createConversation(activeManuscript?.id)}
             title="New conversation"
-            className="flex items-center gap-1 text-xs text-sidebar-text hover:text-white px-2 py-1 rounded hover:bg-sidebar-active transition-colors"
+            className="flex items-center gap-1 text-xs text-neutral-400 hover:text-white px-2 py-1 rounded hover:bg-sidebar-active transition-colors"
           >
             <Plus size={13} /> New Chat
           </button>
           <button
             onClick={() => setChatOpen(false)}
-            className="w-7 h-7 flex items-center justify-center rounded text-sidebar-text hover:text-white hover:bg-sidebar-active transition-colors"
+            className="w-7 h-7 flex items-center justify-center rounded text-neutral-400 hover:text-white hover:bg-sidebar-active transition-colors"
           >
             <X size={14} />
           </button>
@@ -148,7 +148,7 @@ export default function AIChatOverlay() {
               flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all
               ${activeMode === mode.id
                 ? 'bg-brand text-white'
-                : 'text-sidebar-text hover:bg-sidebar-hover hover:text-white'
+                : 'text-neutral-400 hover:bg-sidebar-hover hover:text-white'
               }
             `}
           >
@@ -161,14 +161,14 @@ export default function AIChatOverlay() {
         <div className="relative ml-auto">
           <button
             onClick={() => setShowModelPicker(!showModelPicker)}
-            className="text-[10px] text-sidebar-text/50 hover:text-sidebar-text px-1 py-1 rounded transition-colors truncate max-w-[60px]"
+            className="text-[10px] text-neutral-500 hover:text-neutral-300 px-1 py-1 rounded transition-colors truncate max-w-[60px]"
             title={selectedModel}
           >
             {selectedModel.split('/').pop()?.split(':')[0] ?? 'Model'}
           </button>
           {showModelPicker && (
             <div className="absolute bottom-8 right-0 bg-[#1f1f1f] border border-sidebar-border rounded-lg shadow-xl py-1 z-50 w-56 animate-slide-up">
-              <p className="px-3 py-1 text-[10px] uppercase tracking-widest text-sidebar-text/40 font-bold">Free Models</p>
+              <p className="px-3 py-1 text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Free Models</p>
               {FREE_MODELS.map(m => (
                 <button
                   key={m.id}
@@ -179,7 +179,7 @@ export default function AIChatOverlay() {
                   className={`w-full text-left px-3 py-2 text-xs transition-colors ${
                     selectedModel === m.id
                       ? 'text-white font-semibold'
-                      : 'text-sidebar-text hover:text-white hover:bg-sidebar-hover'
+                      : 'text-neutral-400 hover:text-white hover:bg-sidebar-hover'
                   }`}
                 >
                   {m.label}
@@ -220,8 +220,8 @@ export default function AIChatOverlay() {
         {aiMessages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full py-8 text-center">
             <Bot size={32} className="text-brand/40 mb-3" />
-            <p className="text-sm text-sidebar-text font-medium">How can I help you today?</p>
-            <p className="text-xs text-sidebar-text/40 mt-1 max-w-[200px]">
+            <p className="text-sm text-white font-medium">How can I help you today?</p>
+            <p className="text-xs text-neutral-400 mt-1 max-w-[200px]">
               {activeMode === 'write' && 'Ask me to improve a passage, suggest plot ideas, or help with dialogue.'}
               {activeMode === 'publish' && 'Ask about query letters, self-publishing, royalties, ISBN, or anything publishing.'}
               {activeMode === 'factcheck' && 'Describe a scene and ask "is this realistic?" or "would this actually happen?"'}
@@ -237,7 +237,7 @@ export default function AIChatOverlay() {
                 <button
                   key={prompt}
                   onClick={() => { setInput(prompt); inputRef.current?.focus() }}
-                  className="w-full text-left text-xs text-sidebar-text/60 hover:text-white hover:bg-sidebar-hover px-3 py-2 rounded-lg border border-sidebar-border/50 transition-all"
+                  className="w-full text-left text-xs text-neutral-300 hover:text-white hover:bg-sidebar-hover px-3 py-2 rounded-lg border border-sidebar-border/50 transition-all"
                 >
                   {prompt}
                 </button>
@@ -250,7 +250,7 @@ export default function AIChatOverlay() {
                 <button
                   key={prompt}
                   onClick={() => { setInput(prompt); inputRef.current?.focus() }}
-                  className="w-full text-left text-xs text-sidebar-text/60 hover:text-white hover:bg-sidebar-hover px-3 py-2 rounded-lg border border-sidebar-border/50 transition-all"
+                  className="w-full text-left text-xs text-neutral-300 hover:text-white hover:bg-sidebar-hover px-3 py-2 rounded-lg border border-sidebar-border/50 transition-all"
                 >
                   {prompt}
                 </button>
@@ -263,7 +263,7 @@ export default function AIChatOverlay() {
                 <button
                   key={prompt}
                   onClick={() => { setInput(prompt); inputRef.current?.focus() }}
-                  className="w-full text-left text-xs text-sidebar-text/60 hover:text-white hover:bg-sidebar-hover px-3 py-2 rounded-lg border border-sidebar-border/50 transition-all"
+                  className="w-full text-left text-xs text-neutral-300 hover:text-white hover:bg-sidebar-hover px-3 py-2 rounded-lg border border-sidebar-border/50 transition-all"
                 >
                   {prompt}
                 </button>
@@ -304,7 +304,7 @@ export default function AIChatOverlay() {
           placeholder="Ask anything…"
           rows={1}
           className="flex-1 bg-sidebar-hover text-white text-sm px-3 py-2 rounded-xl resize-none
-            placeholder:text-sidebar-text/40 focus:outline-none focus:ring-1 focus:ring-brand/40
+            placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-brand/40
             allow-select transition-all"
           style={{ maxHeight: 120 }}
           onInput={(e) => {
