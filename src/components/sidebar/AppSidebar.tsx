@@ -24,24 +24,24 @@ export default function AppSidebar() {
     setActiveManuscript,
     setChatOpen,
     isChatOpen,
+    sidebarOpen,
+    setSidebarOpen,
   } = useStudioStore()
 
   function handleNav(view: AppView) {
     if (view === 'ai') {
       setChatOpen(!isChatOpen)
-      return
-    }
-    if (view === 'corkboard') {
-      setView('corkboard')
+      setSidebarOpen(false)
       return
     }
     setView(view)
+    setSidebarOpen(false)
   }
 
   const recentDocs = manuscripts.slice(0, 5)
 
   return (
-    <aside className="sidebar w-60 flex-shrink-0 bg-sidebar-bg border-r border-sidebar-border flex flex-col h-full">
+    <aside className={`sidebar w-60 flex-shrink-0 bg-sidebar-bg border-r border-sidebar-border flex flex-col h-full transition-transform duration-300 z-40 md:relative md:translate-x-0 ${sidebarOpen ? 'fixed top-8 bottom-0 left-0 translate-x-0' : 'fixed top-8 bottom-0 left-0 -translate-x-full md:translate-x-0'}`}>
       {/* Navigation */}
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
         {NAV_ITEMS.map(item => (
@@ -80,6 +80,7 @@ export default function AppSidebar() {
               onClick={() => {
                 setActiveManuscript(ms)
                 setView('editor')
+                setSidebarOpen(false)
               }}
               className={`
                 w-full flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg

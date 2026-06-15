@@ -18,6 +18,8 @@ export default function App() {
     fetchFonts,
     fetchSettings,
     isChatOpen,
+    sidebarOpen,
+    setSidebarOpen,
   } = useStudioStore()
 
   const { user, logout } = useAuth()
@@ -36,9 +38,17 @@ export default function App() {
       <TitleBar />
 
       {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         {/* Left Sidebar */}
         <AppSidebar />
+
+        {/* Mobile Sidebar Backdrop */}
+        {sidebarOpen && (
+          <div
+            onClick={() => setSidebarOpen(false)}
+            className="md:hidden fixed inset-0 bg-black/50 z-30 top-8"
+          />
+        )}
 
         {/* Content Area */}
         <main className="flex-1 overflow-hidden relative">

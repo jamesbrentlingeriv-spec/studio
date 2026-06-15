@@ -41,6 +41,8 @@ export default function ManuscriptNavigator() {
     createSection,
     deleteSection,
     updateSection,
+    chaptersOpen,
+    setChaptersOpen,
   } = useStudioStore()
 
   const [showAddMenu, setShowAddMenu] = useState(false)
@@ -111,7 +113,12 @@ export default function ManuscriptNavigator() {
             : 'text-sidebar-text hover:bg-sidebar-hover hover:text-white'
           }
         `}
-        onClick={() => !isEditing && setActiveSectionId(section.id)}
+        onClick={() => {
+          if (!isEditing) {
+            setActiveSectionId(section.id)
+            setChaptersOpen(false)
+          }
+        }}
         onDoubleClick={() => startRename(section)}
       >
         <span className="flex-shrink-0 opacity-60">
@@ -180,7 +187,7 @@ export default function ManuscriptNavigator() {
   }
 
   return (
-    <div className="chapters-sidebar w-48 flex-shrink-0 bg-sidebar-bg border-r border-sidebar-border flex flex-col h-full">
+    <div className={`chapters-sidebar w-48 flex-shrink-0 bg-sidebar-bg border-r border-sidebar-border flex flex-col h-full transition-transform duration-300 z-40 md:relative md:translate-x-0 ${chaptersOpen ? 'fixed top-8 bottom-0 left-0 translate-x-0' : 'fixed top-8 bottom-0 left-0 -translate-x-full md:translate-x-0'}`}>
       {/* Navigator Header */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-sidebar-border flex-shrink-0">
         <span className="text-[10px] font-bold uppercase tracking-widest text-sidebar-text/60">

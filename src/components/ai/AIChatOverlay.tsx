@@ -52,7 +52,7 @@ export default function AIChatOverlay() {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
 
-  const selectedModel = settings.openrouter_model ?? 'mistralai/mistral-7b-instruct:free'
+  const selectedModel = settings.openrouter_model ?? 'google/gemini-2.5-flash:free'
 
   // Play/pause video based on AI loading state
   useEffect(() => {

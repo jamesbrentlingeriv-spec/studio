@@ -49,14 +49,14 @@ interface Props {
 }
 
 export default function TypesetterPanel({ editor }: Props) {
-  const { activeManuscript, updateManuscript } = useStudioStore()
+  const { activeManuscript, updateManuscript, typesetterOpen } = useStudioStore()
   const [isExporting, setIsExporting] = useState(false)
   const [expandedSection, setExpandedSection] = useState<string | null>('layout')
   const [exportSuccess, setExportSuccess] = useState<string | null>(null)
 
   if (!activeManuscript) {
     return (
-      <aside className="typesetter-panel w-72 flex-shrink-0 bg-panel-bg border-l border-panel-border flex items-center justify-center">
+      <aside className={`typesetter-panel w-72 flex-shrink-0 bg-panel-bg border-l border-panel-border flex items-center justify-center transition-transform duration-300 z-40 md:relative md:translate-x-0 ${typesetterOpen ? 'fixed top-8 bottom-0 right-0 translate-x-0' : 'fixed top-8 bottom-0 right-0 translate-x-full md:translate-x-0'}`}>
         <div className="text-center px-6">
           <BookOpen size={28} className="mx-auto mb-3 text-gray-300" />
           <p className="text-sm font-medium text-gray-500">Typesetter</p>
@@ -110,7 +110,7 @@ export default function TypesetterPanel({ editor }: Props) {
   }, [activeManuscript?.id, options])
 
   return (
-    <aside className="typesetter-panel w-72 flex-shrink-0 bg-panel-bg border-l border-panel-border flex flex-col overflow-y-auto">
+    <aside className={`typesetter-panel w-72 flex-shrink-0 bg-panel-bg border-l border-panel-border flex flex-col overflow-y-auto transition-transform duration-300 z-40 md:relative md:translate-x-0 ${typesetterOpen ? 'fixed top-8 bottom-0 right-0 translate-x-0' : 'fixed top-8 bottom-0 right-0 translate-x-full md:translate-x-0'}`}>
       {/* Panel Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-panel-border flex-shrink-0 bg-white/60 backdrop-blur-sm sticky top-0 z-10">
         <div className="flex items-center gap-2">

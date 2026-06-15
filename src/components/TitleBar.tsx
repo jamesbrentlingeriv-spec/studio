@@ -1,12 +1,22 @@
 import { useAuth } from '@/contexts/AuthContext'
+import { useStudioStore } from '@/store/useStudioStore'
+import { Menu } from 'lucide-react'
 
 export default function TitleBar() {
   const { user, logout } = useAuth()
+  const { toggleSidebar } = useStudioStore()
 
   return (
     <div className="flex items-center justify-between h-8 bg-sidebar-bg border-b border-sidebar-border flex-shrink-0 px-3 z-50">
       {/* App branding */}
       <div className="flex items-center gap-2">
+        <button
+          onClick={toggleSidebar}
+          className="md:hidden text-sidebar-text hover:text-white mr-1"
+          title="Toggle Sidebar"
+        >
+          <Menu size={16} />
+        </button>
         <img src="/ns.svg" alt="N.S." className="w-4 h-4 brightness-0 invert" />
         <span className="text-white font-bold text-sm tracking-tight">✦ Novel Studio</span>
       </div>

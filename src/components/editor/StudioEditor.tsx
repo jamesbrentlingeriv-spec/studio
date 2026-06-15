@@ -34,6 +34,12 @@ export default function StudioEditor() {
     sections,
     saveContent,
     settings,
+    chaptersOpen,
+    typesetterOpen,
+    setChaptersOpen,
+    setTypesetterOpen,
+    toggleChapters,
+    toggleTypesetter,
   } = useStudioStore()
 
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -113,9 +119,25 @@ export default function StudioEditor() {
   const charCount = editor?.storage.characterCount.characters() ?? 0
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full relative">
       {/* Manuscript Navigator — left mini sidebar inside editor */}
       <ManuscriptNavigator />
+
+      {/* Mobile Chapters Drawer Backdrop */}
+      {chaptersOpen && (
+        <div
+          onClick={() => setChaptersOpen(false)}
+          className="md:hidden fixed inset-0 bg-black/50 z-30 top-8"
+        />
+      )}
+
+      {/* Mobile Typesetter Drawer Backdrop */}
+      {typesetterOpen && (
+        <div
+          onClick={() => setTypesetterOpen(false)}
+          className="md:hidden fixed inset-0 bg-black/50 z-30 top-8"
+        />
+      )}
 
       {/* Editor Column */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -124,21 +146,38 @@ export default function StudioEditor() {
 
         {/* Document Meta Bar */}
         {activeManuscript && (
-          <div className="flex items-center gap-3 px-6 py-2 bg-white border-b border-gray-100 text-sm text-gray-500 flex-shrink-0">
-            <span className="font-semibold text-[#1a1f2e]">{activeManuscript.title}</span>
+          <div className="flex items-center gap-2 md:gap-3 px-3 md:px-6 py-2 bg-white border-b border-gray-100 text-sm text-gray-500 flex-shrink-0 flex-wrap">
+            {/* Mobile Chapters Toggle */}
+            <button
+              onClick={toggleChapters}
+              className="md:hidden flex items-center gap-1 px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 font-medium active:scale-[0.98] transition-transform"
+            >
+              📚 Chapters
+            </button>
+
+            <span className="font-semibold text-[#1a1f2e] max-w-[100px] md:max-w-none truncate">{activeManuscript.title}</span>
             {activeSection && (
               <>
                 <span>·</span>
-                <span>{activeSection.title}</span>
+                <span className="max-w-[100px] md:max-w-none truncate">{activeSection.title}</span>
               </>
             )}
-            <span className="ml-auto text-xs">
-              {wordCount.toLocaleString()} words · {charCount.toLocaleString()} chars
+            <span className="ml-auto text-[10px] md:text-xs">
+              {wordCount.toLocaleString()} w
             </span>
+
+            {/* Mobile Typesetter Toggle */}
+            <button
+              onClick={toggleTypesetter}
+              className="md:hidden flex items-center gap-1 px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 font-medium active:scale-[0.98] transition-transform ml-1"
+            >
+              🎨 Layout
+            </button>
+
             {/* Focus Mode Toggle */}
             <button
               onClick={() => setFocusMode(!focusMode)}
-              className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded-md transition-all ml-2 ${
+              className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded-md transition-all ml-1 md:ml-2 ${
                 focusMode
                   ? 'bg-brand/15 text-brand font-semibold'
                   : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
@@ -146,7 +185,7 @@ export default function StudioEditor() {
               title="Toggle Focus Mode"
             >
               <Eye size={12} />
-              {focusMode ? 'Focusing' : 'Focus'}
+              <span className="hidden sm:inline">{focusMode ? 'Focusing' : 'Focus'}</span>
             </button>
           </div>
         )}

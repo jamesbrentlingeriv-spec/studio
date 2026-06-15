@@ -48,25 +48,25 @@ export default function BookShelf() {
   return (
     <div className="h-full flex flex-col bg-white">
       {/* Shelf Header */}
-      <div className="border-b border-panel-border bg-white px-8 py-5 flex items-center justify-between flex-shrink-0">
+      <div className="border-b border-panel-border bg-white px-4 md:px-8 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 flex-shrink-0">
         <div>
-          <h1 className="text-2xl font-bold text-[#1a1f2e] tracking-tight flex items-center gap-2">
+          <h1 className="text-xl md:text-2xl font-bold text-[#1a1f2e] tracking-tight flex items-center gap-2">
             <BookMarked size={22} className="text-brand" />
             My Shelf
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <p className="text-xs md:text-sm text-gray-500 mt-0.5">
             {totalBooks} {totalBooks === 1 ? 'book' : 'books'} · {totalWords.toLocaleString()} words total
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3 flex-wrap">
           {/* Search */}
           <input
             type="text"
             placeholder="Search titles, authors…"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="w-52 px-3 py-1.5 text-sm rounded-lg border border-gray-200 bg-gray-50
+            className="flex-1 min-w-[150px] md:w-52 px-3 py-1.5 text-sm rounded-lg border border-gray-200 bg-gray-50
               focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand
               placeholder:text-gray-400 text-[#1a1f2e] transition-all"
           />
@@ -77,7 +77,7 @@ export default function BookShelf() {
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-3 py-1.5 transition-colors capitalize ${
+                className={`px-2 md:px-3 py-1.5 transition-colors capitalize ${
                   filter === f
                     ? 'bg-brand text-white'
                     : 'bg-white text-gray-600 hover:bg-gray-50'
@@ -108,7 +108,7 @@ export default function BookShelf() {
           <button
             id="new-book-btn"
             onClick={() => setShowNewModal(true)}
-            className="flex items-center gap-2 px-4 py-1.5 bg-brand hover:bg-brand-dark
+            className="flex items-center gap-2 px-3 md:px-4 py-1.5 bg-brand hover:bg-brand-dark
               text-white text-sm font-semibold rounded-lg transition-colors shadow-sm"
           >
             <Plus size={16} />
@@ -118,7 +118,7 @@ export default function BookShelf() {
       </div>
 
       {/* Shelf Content */}
-      <div className="flex-1 overflow-y-auto px-8 py-6 allow-select">
+      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 allow-select">
         {manuscripts.length === 0 ? (
           <EmptyShelf onNew={() => setShowNewModal(true)} />
         ) : (

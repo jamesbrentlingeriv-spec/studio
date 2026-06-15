@@ -272,3 +272,17 @@
   box-shadow: none;
   border-radius: 0;
 }
+
+@media (max-width: 640px) {
+  .tiptap-editor-wrapper {
+    padding: 16px 12px 80px;
+  }
+  .tiptap-page {
+    padding: 16px 4px;
+  }
+  .ProseMirror {
+    font-size: 11pt;
+    line-height: 1.6;
+  }
+}
+

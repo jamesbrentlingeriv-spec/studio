@@ -11,6 +11,7 @@
     "lint": "eslint src --ext .ts,.tsx"
   },
   "dependencies": {
+    "@capacitor/core": "^8.4.0",
     "@tiptap/core": "^2.6.6",
     "@tiptap/extension-bold": "^2.6.6",
     "@tiptap/extension-bullet-list": "^2.6.6",
@@ -57,6 +58,8 @@
     "zustand": "^4.5.5"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/cli": "^8.4.0",
     "@types/node": "^22.5.0",
     "@types/react": "^18.3.5",
     "@types/react-beautiful-dnd": "^13.1.8",

@@ -142,6 +142,17 @@ type StudioStore = {
   settings: Record<string, string>
   fetchSettings: () => Promise<void>
   setSetting: (key: string, value: string) => Promise<void>
+
+  // Mobile navigation drawers
+  sidebarOpen: boolean
+  chaptersOpen: boolean
+  typesetterOpen: boolean
+  toggleSidebar: () => void
+  toggleChapters: () => void
+  toggleTypesetter: () => void
+  setSidebarOpen: (val: boolean) => void
+  setChaptersOpen: (val: boolean) => void
+  setTypesetterOpen: (val: boolean) => void
 }
 
 // ─── Zustand Store ────────────────────────────────────────────────────────────
@@ -312,7 +323,7 @@ export const useStudioStore = create<StudioStore>((set, get) => ({
     const { activeConversationId, aiMessages, settings } = get()
     if (!activeConversationId) return
 
-    const selectedModel = model ?? settings.openrouter_model ?? 'mistralai/mistral-7b-instruct:free'
+    const selectedModel = model ?? settings.openrouter_model ?? 'google/gemini-2.5-flash:free'
 
     // Save user message to DB and add to UI
     const userMsg = await studioApi.ai.saveMessage(activeConversationId, 'user', content)
@@ -391,6 +402,17 @@ export const useStudioStore = create<StudioStore>((set, get) => ({
       setApiKey(value)
     }
   },
+
+  // Mobile navigation drawers
+  sidebarOpen: false,
+  chaptersOpen: false,
+  typesetterOpen: false,
+  toggleSidebar: () => set(state => ({ sidebarOpen: !state.sidebarOpen })),
+  toggleChapters: () => set(state => ({ chaptersOpen: !state.chaptersOpen })),
+  toggleTypesetter: () => set(state => ({ typesetterOpen: !state.typesetterOpen })),
+  setSidebarOpen: (val) => set({ sidebarOpen: val }),
+  setChaptersOpen: (val) => set({ chaptersOpen: val }),
+  setTypesetterOpen: (val) => set({ typesetterOpen: val }),
 }))
 
 // ─── Font Injection Helper ─────────────────────────────────────────────────────
