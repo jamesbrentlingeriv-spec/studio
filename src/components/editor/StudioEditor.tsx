@@ -40,6 +40,7 @@ export default function StudioEditor() {
     setTypesetterOpen,
     toggleChapters,
     toggleTypesetter,
+    setEditorInstance,
   } = useStudioStore()
 
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -93,6 +94,16 @@ export default function StudioEditor() {
       }, autosaveMs)
     },
   })
+
+  // Register editor instance globally
+  useEffect(() => {
+    if (editor) {
+      setEditorInstance(editor)
+    }
+    return () => {
+      setEditorInstance(null)
+    }
+  }, [editor])
 
   // Load section content when active section changes
   useEffect(() => {

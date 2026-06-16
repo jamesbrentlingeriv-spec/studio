@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { X, Send, Plus, Bot, Sparkles, BookOpen, SearchCheck } from 'lucide-react'
+import { X, Send, Plus, Bot, Sparkles, BookOpen, SearchCheck, Square } from 'lucide-react'
 import { useStudioStore } from '@/store/useStudioStore'
 import ChatMessage from './ChatMessage'
 import { FREE_MODELS } from '@/lib/constants'
@@ -43,6 +43,7 @@ export default function AIChatOverlay() {
     sendMessage,
     fetchConversations,
     setSetting,
+    stopAISending,
   } = useStudioStore()
 
   const [input, setInput] = useState('')
@@ -314,16 +315,27 @@ export default function AIChatOverlay() {
             t.style.height = `${Math.min(t.scrollHeight, 120)}px`
           }}
         />
-        <button
-          onClick={handleSend}
-          disabled={!input.trim() || isAILoading}
-          className="w-9 h-9 flex items-center justify-center bg-brand hover:bg-brand-dark
-            disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl
-            transition-all flex-shrink-0 shadow-sm"
-          title="Send (Enter)"
-        >
-          <Send size={15} />
-        </button>
+        {isAILoading ? (
+          <button
+            onClick={stopAISending}
+            className="w-9 h-9 flex items-center justify-center bg-red-600 hover:bg-red-700
+              text-white rounded-xl transition-all flex-shrink-0 shadow-sm animate-pulse"
+            title="Stop AI Response"
+          >
+            <Square size={14} fill="white" />
+          </button>
+        ) : (
+          <button
+            onClick={handleSend}
+            disabled={!input.trim()}
+            className="w-9 h-9 flex items-center justify-center bg-brand hover:bg-brand-dark
+              disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl
+              transition-all flex-shrink-0 shadow-sm"
+            title="Send (Enter)"
+          >
+            <Send size={15} />
+          </button>
+        )}
       </div>
     </div>
   )

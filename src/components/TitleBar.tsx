@@ -17,7 +17,7 @@ export default function TitleBar() {
         >
           <Menu size={16} />
         </button>
-        <img src="/ns.svg" alt="N.S." className="w-4 h-4 brightness-0 invert" />
+        <img src="/ns.svg" alt="N.S." className="w-4 h-4 object-contain" />
         <span className="text-white font-bold text-sm tracking-tight">✦ Novel Studio</span>
       </div>
 

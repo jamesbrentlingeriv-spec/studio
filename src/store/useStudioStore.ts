@@ -154,6 +154,14 @@ type StudioStore = {
   setSidebarOpen: (val: boolean) => void
   setChaptersOpen: (val: boolean) => void
   setTypesetterOpen: (val: boolean) => void
+
+  // Editor integration
+  editorInstance: any | null
+  setEditorInstance: (editor: any | null) => void
+
+  // AI Abort control
+  activeAbortController: AbortController | null
+  stopAISending: () => void
 }
 
 // ─── Zustand Store ────────────────────────────────────────────────────────────
@@ -327,9 +335,16 @@ export const useStudioStore = create<StudioStore>((set, get) => ({
     const rawModel = model ?? settings.openrouter_model ?? FREE_MODELS[0].id
     const selectedModel = FREE_MODELS.some(m => m.id === rawModel) ? rawModel : FREE_MODELS[0].id
 
+    // Abort previous stream if any
+    const oldController = get().activeAbortController
+    if (oldController) oldController.abort()
+
+    const controller = new AbortController()
+    set({ activeAbortController: controller, isAILoading: true })
+
     // Save user message to DB and add to UI
     const userMsg = await studioApi.ai.saveMessage(activeConversationId, 'user', content)
-    set(state => ({ aiMessages: [...state.aiMessages, userMsg as AIMessage], isAILoading: true }))
+    set(state => ({ aiMessages: [...state.aiMessages, userMsg as AIMessage] }))
 
     try {
       // Build message history for context
@@ -360,7 +375,7 @@ export const useStudioStore = create<StudioStore>((set, get) => ({
             m.id === tempId ? { ...m, content: fullContent } : m
           ),
         }))
-      })
+      }, controller.signal)
 
       // Persist the completed message
       const savedMsg = await studioApi.ai.saveMessage(activeConversationId, 'assistant', fullContent, selectedModel)
@@ -369,8 +384,13 @@ export const useStudioStore = create<StudioStore>((set, get) => ({
           m.id === tempId ? { ...(savedMsg as AIMessage), content: fullContent } : m
         ),
         isAILoading: false,
+        activeAbortController: null,
       }))
-    } catch (err) {
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log('AI response aborted')
+        return
+      }
       console.error('AI chat error:', err)
       const errorMsg: AIMessage = {
         id: Date.now(),
@@ -380,7 +400,11 @@ export const useStudioStore = create<StudioStore>((set, get) => ({
         model_used: null,
         created_at: new Date().toISOString(),
       }
-      set(state => ({ aiMessages: [...state.aiMessages, errorMsg], isAILoading: false }))
+      set(state => ({ 
+        aiMessages: [...state.aiMessages, errorMsg], 
+        isAILoading: false,
+        activeAbortController: null,
+      }))
     }
   },
 
@@ -415,6 +439,18 @@ export const useStudioStore = create<StudioStore>((set, get) => ({
   setSidebarOpen: (val) => set({ sidebarOpen: val }),
   setChaptersOpen: (val) => set({ chaptersOpen: val }),
   setTypesetterOpen: (val) => set({ typesetterOpen: val }),
+
+  // Editor and Abort controllers
+  editorInstance: null,
+  setEditorInstance: (editor) => set({ editorInstance: editor }),
+  activeAbortController: null,
+  stopAISending: () => {
+    const { activeAbortController } = get()
+    if (activeAbortController) {
+      activeAbortController.abort()
+      set({ activeAbortController: null, isAILoading: false })
+    }
+  },
 }))
 
 // ─── Font Injection Helper ─────────────────────────────────────────────────────

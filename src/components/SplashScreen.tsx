@@ -54,7 +54,7 @@ export default function SplashScreen({ onFinished }: SplashScreenProps) {
           <img
             src="/ns.svg"
             alt="N.S. Studio"
-            className="w-full h-full object-contain drop-shadow-2xl brightness-0 invert"
+            className="w-full h-full object-contain"
           />
         </div>
 
