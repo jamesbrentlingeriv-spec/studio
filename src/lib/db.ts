@@ -111,7 +111,7 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   autosave_interval_ms: '30000',
   focus_mode_opacity: '0.15',
   openrouter_api_key: '',
-  openrouter_model: 'openrouter/free',
+  openrouter_model: 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
   sidebar_visible: 'true',
   typesetter_visible: 'true',
 }

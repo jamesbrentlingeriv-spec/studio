@@ -1,6 +1,7 @@
 // Shared constants — safe to import in both main process and renderer
 
 export const FREE_MODELS = [
+  { id: 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free', label: 'Venice Uncensored (Free)' },
   { id: 'openrouter/free', label: 'Auto Free Router (Free)' },
   { id: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Llama 3.3 70B (Free)' },
   { id: 'deepseek/deepseek-r1:free', label: 'DeepSeek R1 (Free)' },
